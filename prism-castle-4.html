@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>柱體城堡大作戰</title>
+<style>
+/* Offline iPad game. Toy-block world: sky-mint ground, block colours; purple = 底, orange = 側面 (textbook colours). */
+:root{
+  --bg:#E6F1F4;
+  --paper:#FFFFFF;
+  --ink:#1E2938;
+  --muted:#5B6878;
+  --line:#CFDAE1;
+  --accent:#2F5BD3;
+  --accent-soft:#E2EAFF;
+  --base:#8240C4;
+  --base-soft:#F0E4FB;
+  --side:#C9670F;
+  --side-soft:#FDEAD6;
+  --good:#23885C;
+  --good-soft:#DDF3E8;
+  --warn:#C0462F;
+  --warn-soft:#FBE4DE;
+  --gold:#F2A900;
+  --stage:#DCE8EF;
+  --night:#24304A;
+  --font:"PingFang TC","Heiti TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:18px;line-height:1.5;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;overflow-x:hidden}
+button{font:inherit;color:inherit;touch-action:manipulation;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+[hidden]{display:none!important}
+.screen{min-height:100%;padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+
+/* ---------- shared pills ---------- */
+.coins{display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:2px solid #F3D27A;border-radius:999px;padding:4px 14px 4px 6px;font-weight:800;font-variant-numeric:tabular-nums;position:relative}
+.coin{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FFE38A,#F2A900 70%);border:2px solid #C98A00;display:inline-block}
+.iconbtn{background:var(--paper);border:2px solid var(--line);border-radius:12px;padding:6px 12px;font-weight:700;min-height:44px}
+
+/* ---------- home ---------- */
+#home{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.home-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.home-top h1{margin:0;font-size:clamp(32px,5.5vw,48px);letter-spacing:.04em;line-height:1.1}
+.home-top h1 span{color:var(--base)}
+.home-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.story{margin:0;color:var(--muted)}
+.castle-wrap{background:linear-gradient(#CBE4F3,#EAF4F7 75%);border:2px solid var(--line);border-radius:24px;padding:6px 6px 0;overflow:hidden}
+#castle{display:block;width:100%;max-height:30vh}
+#castle .pop{animation:drop .8s cubic-bezier(.2,1.6,.4,1) both;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes drop{from{transform:translateY(-50px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+.levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.levels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lv{position:relative;text-align:left;background:var(--paper);border:2px solid var(--line);border-radius:18px;padding:12px 14px;min-height:118px;display:grid;grid-template-columns:64px minmax(0,1fr);gap:4px 12px;align-items:center}
+.lv .mini{grid-row:span 3;width:64px;height:60px}
+.lv .no{font-size:14px;font-weight:700;color:var(--muted)}
+.lv .tt{font-size:21px;font-weight:800;line-height:1.2}
+.lv .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{font-size:13px;font-weight:700;border-radius:999px;padding:1px 9px;background:var(--accent-soft);color:var(--accent)}
+.tag.t-base{background:var(--base-soft);color:var(--base)}
+.tag.t-side{background:var(--side-soft);color:var(--side)}
+.stars{font-size:19px;letter-spacing:1px;color:#C9D2DA}
+.stars b{color:var(--gold);font-weight:400}
+.lv.locked{opacity:.5;cursor:not-allowed}
+.lv.locked .mini{filter:grayscale(1) brightness(.6)}
+.lv.locked::after{content:"鎖住";position:absolute;right:12px;top:10px;font-size:13px;font-weight:700;color:var(--muted);border:1.5px solid var(--line);border-radius:8px;padding:0 6px}
+.lv.beaten .mini{opacity:.55}
+.lv.beaten::after{content:"打敗了";position:absolute;right:12px;top:10px;font-size:13px;font-weight:800;color:var(--good);border:2px solid var(--good);border-radius:8px;padding:0 6px;transform:rotate(6deg)}
+.lv.lv-next{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);animation:breathe 2s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 8px var(--accent-soft)}}
+.teacher{display:flex;gap:16px;justify-content:flex-end;flex-wrap:wrap}
+.tiny{background:none;border:none;color:var(--muted);font-size:14px;text-decoration:underline;padding:6px 2px}
+
+/* ---------- play ---------- */
+#play{height:100%;display:flex;flex-direction:column;gap:10px}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.back{background:var(--paper);border:2px solid var(--line);border-radius:12px;padding:6px 14px;font-weight:700;min-height:46px}
+.lvname{font-size:21px;font-weight:800;flex:1;min-width:0}
+.lvname small{font-size:14px;color:var(--muted);font-weight:700;margin-right:8px}
+.lives{display:inline-flex;align-items:center;gap:3px;background:var(--paper);border:2px solid var(--line);border-radius:999px;padding:4px 10px;font-weight:800;font-size:14px}
+.lives .heart{width:20px;height:18px;display:block}
+.lives .heart path{fill:#3E9BE0;stroke:#fff;stroke-width:1.5}
+.lives .heart.gone path{fill:#D5DDE3;stroke:#fff}
+#play.cool .playgrid{pointer-events:none}
+#play.cool .controls{opacity:.55}
+.combo{font-weight:900;color:#E2541B;font-size:20px;min-width:0}
+.combo.bump{animation:bump .4s}
+@keyframes bump{40%{transform:scale(1.4)}}
+.playgrid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+.stage{position:relative;background:var(--stage);border:3px solid var(--line);border-radius:22px;overflow:hidden;min-height:300px;touch-action:none;overscroll-behavior:contain;-webkit-touch-callout:none;
+  background-image:radial-gradient(#C3D3DE 1.3px,transparent 1.5px);background-size:22px 22px;transition:border-color .2s}
+.stage.flash-good{border-color:var(--good)} .stage.flash-bad{border-color:var(--warn);animation:shake .35s}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage-hint{position:absolute;left:12px;bottom:10px;font-size:14px;color:var(--muted);background:var(--paper);border-radius:10px;padding:3px 10px;pointer-events:none}
+.stage .xtag{position:absolute;right:12px;top:10px;font-size:14px;font-weight:700;background:var(--paper);border-radius:10px;padding:3px 10px;pointer-events:none}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+
+/* monster box */
+.mbox{position:relative;display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;align-items:center;background:var(--night);color:#fff;border-radius:18px;padding:8px 12px;min-height:108px}
+#mArt svg{width:104px;height:96px;overflow:visible;display:block}
+.mbox .heart{width:24px;height:22px;display:block}
+.mname{font-weight:800;font-size:18px}
+.hearts{display:flex;gap:4px;margin:2px 0}
+.heart{width:24px;height:22px}
+.heart path{fill:#F25C54;stroke:#fff;stroke-width:1.5}
+.heart.gone path{fill:#4A5672;stroke:#6B7894}
+.heart.lose{animation:lose .6s}
+@keyframes lose{30%{transform:scale(1.6)}100%{transform:scale(1)}}
+.mtalk{font-size:16px;color:#FFE38A;min-height:1.5em}
+.monster{transform-origin:50% 90%}
+.monster.idle{animation:bob 2s ease-in-out infinite}
+.monster.hit{animation:hitshake .5s}
+.monster.crit{animation:crit .7s}
+.monster.laugh{animation:hop .55s 2}
+.monster.dead{animation:defeat 1.1s forwards}
+@keyframes bob{50%{transform:translateY(-5px)}}
+@keyframes hitshake{0%,100%{transform:none;filter:none}20%{transform:translateX(-8px) rotate(-6deg);filter:brightness(2.2)}40%{transform:translateX(7px) rotate(5deg)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+@keyframes crit{0%{transform:none}15%{transform:scale(1.15) rotate(-10deg);filter:brightness(2.6)}35%{transform:translateX(12px) rotate(10deg)}55%{transform:translateX(-10px) rotate(-6deg)}100%{transform:none;filter:none}}
+@keyframes hop{50%{transform:translateY(-12px) scaleY(1.05)}}
+@keyframes defeat{30%{transform:rotate(-20deg) scale(1.1)}100%{transform:rotate(200deg) scale(0) translateY(40px);opacity:0}}
+.monster .eyes-x,.monster .mouth-open{display:none}
+.monster.hit .eyes,.monster.crit .eyes,.monster.dead .eyes{display:none}
+.monster.hit .eyes-x,.monster.crit .eyes-x,.monster.dead .eyes-x{display:inline}
+.monster.laugh .mouth,.monster.hit .mouth,.monster.crit .mouth,.monster.dead .mouth{display:none}
+.monster.laugh .mouth-open,.monster.hit .mouth-open,.monster.crit .mouth-open,.monster.dead .mouth-open{display:inline}
+.pop-txt{position:absolute;font-weight:900;pointer-events:none;animation:rise 1s forwards;white-space:nowrap;text-shadow:0 2px 0 rgba(0,0,0,.25);z-index:5}
+.pop-txt.dmg{left:48px;top:6px;color:#FFE38A;font-size:26px}
+.pop-txt.critx{left:12px;top:-6px;color:#FF7A45;font-size:30px}
+.pop-txt.cn{right:-4px;top:-18px;color:#C98A00;font-size:20px}
+@keyframes rise{0%{transform:translateY(8px) scale(.6);opacity:0}20%{transform:translateY(0) scale(1.15);opacity:1}100%{transform:translateY(-34px);opacity:0}}
+
+.prompt{font-size:22px;font-weight:800;line-height:1.35}
+.prompt .b{color:var(--base)} .prompt .s{color:var(--side)}
+.bubble{display:flex;gap:10px;align-items:flex-start;background:var(--paper);border:2px solid var(--line);border-radius:16px;padding:8px 12px;min-height:56px;font-size:17px}
+.bubble .who{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800}
+.bubble p{margin:4px 0 0;min-width:0}
+.bubble.good{border-color:var(--good);background:var(--good-soft)}
+.bubble.warn{border-color:var(--warn);background:var(--warn-soft)}
+.bubble .b,.prompt .b{color:var(--base);font-weight:800} .bubble .s{color:var(--side);font-weight:800}
+.controls{display:flex;flex-direction:column;gap:10px}
+.counter{font-size:19px;font-weight:700}
+.counter b{font-size:32px;color:var(--side);margin:0 4px}
+.picked{display:flex;gap:8px;align-items:center;font-weight:700;color:var(--muted)}
+.picked i{width:30px;height:30px;border-radius:8px;border:2px dashed var(--line);display:inline-block}
+.picked i.on{background:#F5C518;border:2px solid #D9A800}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.big{border:none;border-radius:16px;padding:10px 18px;min-height:54px;font-size:20px;font-weight:800;background:var(--accent);color:#fff}
+.big.alt{background:var(--paper);color:var(--ink);border:2px solid var(--line)}
+.redo{background:var(--paper);border:2px solid var(--line);border-radius:16px;padding:8px 16px;min-height:54px;font-size:18px;font-weight:800;color:var(--ink)}
+.next{flex:1;border:none;border-radius:16px;padding:10px 18px;min-height:58px;font-size:22px;font-weight:800;background:var(--good);color:#fff;animation:nudge 1.4s ease-in-out infinite}
+@keyframes nudge{50%{transform:translateX(4px)}}
+
+.namebox{display:flex;align-items:center;gap:2px;min-height:60px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:6px 12px;font-size:32px;font-weight:800;letter-spacing:.06em}
+.namebox .ph{font-size:17px;color:var(--muted);font-weight:500;letter-spacing:0}
+.namebox .caret{width:3px;height:34px;background:var(--accent);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.namebox.ok{border-color:var(--good);background:var(--good-soft)}
+.keys{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.key{min-height:50px;border-radius:12px;border:2px solid var(--line);background:var(--paper);font-size:23px;font-weight:700;border-bottom-width:4px}
+.key.word{background:#FFF7E6;border-color:#F0D9A8}
+.key.fn{font-size:15px;background:var(--bg)}
+.key:active{transform:translateY(2px);border-bottom-width:2px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.opt.txt{min-height:64px;justify-content:center;font-size:22px}
+.opt{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--paper);border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;padding:8px;font-size:18px;font-weight:700;min-height:96px}
+.opt svg{width:64px;height:52px}
+.opt.right,.num.right{border-color:var(--good);background:var(--good-soft)}
+.opt.wrong,.num.wrong{border-color:var(--warn);background:var(--warn-soft);opacity:.65}
+.nums{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.sortgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.scard{background:var(--paper);border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:700;font-size:16px}
+.scard img{width:100%;aspect-ratio:4/3;object-fit:contain}
+.scard .chip{font-size:14px;border-radius:999px;padding:0 10px;background:var(--bg);color:var(--muted)}
+.scard .chip.prism{background:var(--side-soft);color:var(--side)}
+.scard .chip.cyl{background:var(--good-soft);color:var(--good)}
+.scard.bad{border-color:var(--warn);background:var(--warn-soft)}
+.scard.ok{border-color:var(--good)}
+.fillsent{font-size:20px;line-height:2.2;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:8px 14px}
+.blank{display:inline-block;min-width:3em;text-align:center;border-bottom:3px solid var(--line);color:var(--accent);font-weight:800;padding:0 6px;line-height:1.5}
+.blank.cur{border-color:var(--accent);background:var(--accent-soft)}
+.blank.miss{color:var(--warn)}
+.stmt{font-size:22px;font-weight:800;background:#FFF7E6;border:2px solid #F0D9A8;border-radius:14px;padding:10px 14px}
+.lv.lv-final{grid-column:1/-1;background:linear-gradient(120deg,#FFF6D8,#F3E6FF);border-color:#E3B341}
+.lv.lv-final .tt{font-size:24px}
+.lv.lv-final.locked::after{content:"集齊城堡後開啟"}
+.num{min-height:58px;border-radius:14px;border:2px solid var(--line);border-bottom-width:4px;background:var(--paper);font-size:27px;font-weight:800}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+@media (max-aspect-ratio:1/1){
+  #play{height:auto;min-height:100%}
+  .playgrid{flex:none;grid-template-columns:minmax(0,1fr)}
+  .stage{height:42vh;height:42dvh}
+  .side{overflow:visible}
+  .mbox{order:-1}
+}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;background:rgba(20,30,45,.5);display:grid;place-items:center;padding:20px;z-index:20}
+.ov-card{background:var(--paper);border-radius:24px;padding:22px;max-width:480px;width:100%;max-height:92vh;overflow:auto;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.ov-card h2{margin:0;font-size:30px}
+.ov-stars{font-size:52px;letter-spacing:6px;color:#D5DCE2;line-height:1}
+.ov-stars b{color:var(--gold);font-weight:400;display:inline-block;animation:drop .5s both}
+.ov-stars b:nth-child(2){animation-delay:.2s}.ov-stars b:nth-child(3){animation-delay:.4s}
+.ov-card p{margin:0}
+.ov-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.newcards{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.newcards .card{width:96px}
+.album{max-width:900px}
+.album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;width:100%}
+.card{background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:14px;font-weight:700;line-height:1.3}
+.card img{width:100%;aspect-ratio:4/3;object-fit:contain}
+.card .ty{font-size:12px;color:var(--muted);font-weight:700}
+.card.lock{color:var(--muted)}
+.card.got{background:#FFFBEF;border-color:#F3D27A}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="home" class="screen">
+  <div class="home-top">
+    <h1>柱體城堡<span>大作戰</span></h1>
+    <div class="home-tools">
+      <span class="coins" id="homeCoins"><i class="coin"></i><span>0</span></span>
+      <button class="iconbtn" id="albumBtn" type="button">柱體圖鑑</button>
+      <button class="iconbtn" id="soundBtn" type="button">聲音：開</button>
+    </div>
+  </div>
+  <p class="story">搗蛋怪把城堡的柱體積木搶走了！認出它們的<b style="color:var(--base)">底</b>、<b style="color:var(--side)">側面</b>和名稱，打敗搗蛋怪，把積木拿回來。</p>
+  <div class="castle-wrap"><svg id="castle" viewBox="0 0 400 250" role="img" aria-label="柱體城堡"></svg></div>
+  <div class="levels" id="levels"></div>
+  <div class="teacher">
+    <button class="tiny" id="unlockBtn" type="button">老師：全部解鎖</button>
+    <button class="tiny" id="resetBtn" type="button">重設進度</button>
+  </div>
+</div>
+
+<div id="play" class="screen" hidden>
+  <div class="bar">
+    <button class="back" id="backBtn" type="button">← 城堡</button>
+    <div class="lvname" id="lvName"></div>
+    <div class="combo" id="combo"></div>
+    <span class="lives" id="lives" title="勇氣"></span>
+    <span class="coins" id="playCoins"><i class="coin"></i><span>0</span></span>
+  </div>
+  <div class="playgrid">
+    <div class="stage" id="stage"><canvas id="cv"></canvas><div class="stage-hint" id="stageHint"></div><div class="xtag" id="xtag" hidden>虛線＝躲起來的邊</div></div>
+    <div class="side">
+      <div class="mbox" id="mbox">
+        <div id="mArt"></div>
+        <div><div class="mname" id="mName"></div><div class="hearts" id="hearts"></div><div class="mtalk" id="mTalk"></div></div>
+      </div>
+      <div class="prompt" id="prompt"></div>
+      <div class="bubble" id="bubble"><div class="who">師</div><p id="msg"></p></div>
+      <div class="controls" id="controls"></div>
+      <div class="actions">
+        <button class="redo" id="redoBtn" type="button">↺ 重做</button>
+        <button class="redo" id="retryBtn" type="button" hidden>↺ 再試一次這題</button>
+        <button class="next" id="nextBtn" type="button" hidden>下一題 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden><div class="ov-card" id="ovCard"></div></div>
+<canvas id="fx"></canvas>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const rnd=Math.random;
+const pick=a=>a[Math.floor(rnd()*a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const CN=['零','一','二','三','四','五','六','七','八','九','十'];
+const polyName=n=>n===3?'三角形':n===4?'四邊形':CN[n]+'邊形';
+const typeName=n=>n==='c'?'圓柱體':CN[n]+'角柱體';
+
+/* =====================================================================
+   Sound (generated, works offline)
+   ===================================================================== */
+let AC=null,soundOn=true;
+function tone(f,d,type,vol,delay){
+  if(!soundOn)return;
+  try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();
+    const t=AC.currentTime+(delay||0),o=AC.createOscillator(),g=AC.createGain();
+    o.type=type||'triangle';o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(vol||0.12,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);
+    o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+0.02);}catch(_){}
+}
+const SFX={
+  tap(){tone(700,.07,'triangle',.07);},
+  good(){tone(660,.12);tone(990,.2,'triangle',.13,.09);},
+  bad(){tone(240,.18,'square',.05);tone(180,.26,'square',.05,.12);},
+  hit(){tone(160,.14,'sawtooth',.1);tone(90,.2,'square',.07,.05);},
+  crit(){[523,659,784,1046].forEach((f,i)=>tone(f,.16,'triangle',.12,i*.06));tone(110,.25,'sawtooth',.1,.05);},
+  coin(){tone(1320,.08,'square',.05);tone(1760,.12,'square',.05,.06);},
+  win(){[523,659,784,1046,784,1046,1318].forEach((f,i)=>tone(f,.22,'triangle',.12,i*.12));},
+  laugh(){[520,460,520,460].forEach((f,i)=>tone(f,.09,'square',.04,i*.1));}
+};
+
+/* =====================================================================
+   Tiny 3D engine on canvas 2D
+   ===================================================================== */
+const Q={
+  mul(a,b){return[a[0]*b[3]+a[3]*b[0]+a[1]*b[2]-a[2]*b[1],a[1]*b[3]+a[3]*b[1]+a[2]*b[0]-a[0]*b[2],a[2]*b[3]+a[3]*b[2]+a[0]*b[1]-a[1]*b[0],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];},
+  axis(ax,ang){const s=Math.sin(ang/2);return[ax[0]*s,ax[1]*s,ax[2]*s,Math.cos(ang/2)];},
+  rot(q,v){const[x,y,z,w]=q;const ix=w*v[0]+y*v[2]-z*v[1],iy=w*v[1]+z*v[0]-x*v[2],iz=w*v[2]+x*v[1]-y*v[0],iw=-x*v[0]-y*v[1]-z*v[2];
+    return[ix*w+iw*-x+iy*-z-iz*-y,iy*w+iw*-y+iz*-x-ix*-z,iz*w+iw*-z+ix*-y-iy*-x];},
+  norm(q){const l=Math.hypot(q[0],q[1],q[2],q[3])||1;return q.map(c=>c/l);},
+  euler(x,y,z){const c1=Math.cos(x/2),c2=Math.cos(y/2),c3=Math.cos(z/2),s1=Math.sin(x/2),s2=Math.sin(y/2),s3=Math.sin(z/2);
+    return[s1*c2*c3+c1*s2*s3,c1*s2*c3-s1*c2*s3,c1*c2*s3+s1*s2*c3,c1*c2*c3-s1*s2*s3];},
+  fromUnit(u,v){let r=u[0]*v[0]+u[1]*v[1]+u[2]*v[2]+1,q;
+    if(r<1e-6){r=0;q=Math.abs(u[0])>Math.abs(u[2])?[-u[1],u[0],0,r]:[0,-u[2],u[1],r];}
+    else q=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0],r];return Q.norm(q);},
+  slerp(a,b,t){let d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]+a[3]*b[3];if(d<0){b=b.map(c=>-c);d=-d;}
+    if(d>0.9995)return Q.norm(a.map((c,i)=>c+(b[i]-c)*t));
+    const th=Math.acos(d),s=Math.sin(th),wa=Math.sin((1-t)*th)/s,wb=Math.sin(t*th)/s;return a.map((c,i)=>c*wa+b[i]*wb);}
+};
+const nrm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return[v[0]/l,v[1]/l,v[2]/l];};
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+
+function finalize(m){
+  const map=new Map();
+  m.polys.forEach((p,pi)=>{const n=p.idx.length;for(let k=0;k<n;k++){const a=p.idx[k],b=p.idx[(k+1)%n],key=a<b?a+'_'+b:b+'_'+a;
+    if(!map.has(key))map.set(key,{a,b,ps:[]});map.get(key).ps.push(pi);}});
+  m.edges=[];map.forEach(e=>{if(e.ps.length===2)m.edges.push([e.a,e.b,e.ps[0],e.ps[1]]);});
+  return m;
+}
+function prismModel(pts,h){
+  const n=pts.length,verts=[],polys=[],faces=[];
+  pts.forEach(p=>verts.push([p[0],h/2,p[1]]));pts.forEach(p=>verts.push([p[0],-h/2,p[1]]));
+  faces.push({cap:true,curved:false,normal:[0,1,0],stamp:{kind:'poly',pts}});
+  faces.push({cap:true,curved:false,normal:[0,-1,0],stamp:{kind:'poly',pts}});
+  polys.push({o:0,idx:[...Array(n).keys()],n:[0,1,0]});
+  polys.push({o:1,idx:[...Array(n).keys()].map(i=>n+i),n:[0,-1,0]});
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n,a=pts[i],b=pts[j],mx=(a[0]+b[0])/2,mz=(a[1]+b[1])/2;
+    let nn=nrm([b[1]-a[1],0,-(b[0]-a[0])]);if(nn[0]*mx+nn[2]*mz<0)nn=nn.map(c=>-c);
+    faces.push({cap:false,curved:false,normal:nn,stamp:{kind:'rect',w:Math.hypot(b[0]-a[0],b[1]-a[1]),h}});
+    polys.push({o:faces.length-1,idx:[i,j,n+j,n+i],n:nn});
+  }
+  return finalize({verts,polys,faces});
+}
+function cylModel(r,h){
+  const S=48,verts=[],polys=[],faces=[];
+  for(let k=0;k<S;k++){const a=k/S*Math.PI*2;verts.push([r*Math.cos(a),h/2,r*Math.sin(a)]);}
+  for(let k=0;k<S;k++){const a=k/S*Math.PI*2;verts.push([r*Math.cos(a),-h/2,r*Math.sin(a)]);}
+  faces.push({cap:true,curved:false,normal:[0,1,0],stamp:{kind:'circle'}});
+  faces.push({cap:true,curved:false,normal:[0,-1,0],stamp:{kind:'circle'}});
+  faces.push({cap:false,curved:true,normal:[0,0,1],stamp:{kind:'curve'}});
+  polys.push({o:0,idx:[...Array(S).keys()],n:[0,1,0]});
+  polys.push({o:1,idx:[...Array(S).keys()].map(i=>S+i),n:[0,-1,0]});
+  for(let k=0;k<S;k++){const k1=(k+1)%S,a=(k+.5)/S*Math.PI*2;polys.push({o:2,idx:[k,k1,S+k1,S+k],n:[Math.cos(a),0,Math.sin(a)]});}
+  return finalize({verts,polys,faces});
+}
+
+/* ---------- prism variants (textbook-like) ---------- */
+const reg=(n,r,off)=>Array.from({length:n},(_,i)=>{const a=(off||0)+i*2*Math.PI/n;return[r*Math.cos(a),r*Math.sin(a)];});
+function cyc(n,jit){const step=2*Math.PI/n,off=rnd()*2*Math.PI,sx=0.85+rnd()*0.3,p=[];
+  for(let i=0;i<n;i++){const a=off+i*step+(rnd()-.5)*2*jit*step;p.push([Math.cos(a)*sx,Math.sin(a)]);}return p;}
+function trap(){const a=0.95+rnd()*0.3,b=0.42+rnd()*0.25,d=0.55+rnd()*0.15;return[[-a,d],[a,d],[b,-d],[-b,-d]];}
+/* rest: natural pose. box: any pair of opposite faces may be bases. amb: has an identical, face-to-face pair of side faces (kept out of 找底). */
+const VARIANTS=[
+  {id:'t1',n:3,nick:'標準',     rest:'up',  make:()=>({pts:reg(3,1,Math.PI/2),h:1.9})},
+  {id:'t2',n:3,nick:'門擋',     rest:'lie', make:()=>({pts:[[-1,-0.55],[1.05,-0.55],[-1,0.6]],h:1.3})},
+  {id:'t3',n:3,nick:'朱古力盒', rest:'diag',make:()=>({pts:reg(3,0.42,Math.PI/2),h:3})},
+  {id:'t4',n:3,nick:'三角餅乾', rest:'up',  make:()=>({pts:reg(3,1.25,Math.PI/2),h:0.36})},
+  {id:'t5',n:3,nick:'斜斜三角', rest:'lie', make:()=>({pts:[[-1.3,0.35],[1.2,0.35],[-0.35,-0.6]],h:1.5})},
+  {id:'q1',n:4,nick:'梯形',     rest:'up',  make:()=>({pts:trap(),h:1.4})},
+  {id:'q2',n:4,nick:'正方體',   rest:'up',  box:true,make:()=>({pts:[[-.7,-.7],[.7,-.7],[.7,.7],[-.7,.7]],h:1.4})},
+  {id:'q3',n:4,nick:'扁長方體', rest:'up',  box:true,make:()=>({pts:[[-1.3,-.55],[1.3,-.55],[1.3,.55],[-1.3,.55]],h:0.35})},
+  {id:'q4',n:4,nick:'高長方體', rest:'up',  box:true,make:()=>({pts:[[-.45,-.45],[.45,-.45],[.45,.45],[-.45,.45]],h:2.6})},
+  {id:'q5',n:4,nick:'平行四邊形',rest:'up', amb:true,make:()=>({pts:[[-1.2,.5],[0.55,.5],[1.2,-.5],[-0.55,-.5]],h:1.1})},
+  {id:'q6',n:4,nick:'風箏',     rest:'lie', make:()=>({pts:[[0,-1.05],[0.7,0],[0,0.5],[-0.7,0]],h:1.6})},
+  {id:'p1',n:5,nick:'標準',     rest:'up',  make:()=>({pts:reg(5,1.1,-Math.PI/2),h:1.2})},
+  {id:'p2',n:5,nick:'小屋',     rest:'lie', amb:true,make:()=>({pts:[[-0.8,0.7],[0.8,0.7],[0.8,-0.15],[0,-0.95],[-0.8,-0.15]],h:2.2})},
+  {id:'p3',n:5,nick:'長長五角', rest:'diag',make:()=>({pts:reg(5,0.5,-Math.PI/2),h:2.9})},
+  {id:'p4',n:5,nick:'五角餅乾', rest:'up',  make:()=>({pts:reg(5,1.25,-Math.PI/2),h:0.4})},
+  {id:'p6',n:5,nick:'躺下的五角',rest:'lie', make:()=>({pts:reg(5,0.75,-Math.PI/2),h:2.4})},
+  {id:'h1',n:6,nick:'螺絲帽',   rest:'up',  amb:true,make:()=>({pts:reg(6,1.2,0),h:0.6})},
+  {id:'h2',n:6,nick:'六角鉛筆', rest:'diag',amb:true,make:()=>({pts:reg(6,0.36,0),h:3.2})},
+  {id:'h3',n:6,nick:'歪歪六角', rest:'up',  make:()=>({pts:cyc(6,0.2),h:1.3})},
+  {id:'h4',n:6,nick:'標準',     rest:'up',  amb:true,make:()=>({pts:reg(6,1,0),h:1.6})},
+  {id:'s1',n:7,nick:'標準',     rest:'up',  make:()=>({pts:reg(7,1.15,-Math.PI/2),h:1.1})},
+  {id:'s2',n:7,nick:'七角硬幣', rest:'lie', make:()=>({pts:reg(7,1.2,-Math.PI/2),h:0.42})},
+  {id:'o1',n:8,nick:'八角餅罐', rest:'up',  amb:true,make:()=>({pts:reg(8,1.2,Math.PI/8),h:0.9})},
+  {id:'o2',n:8,nick:'歪歪八角', rest:'up',  make:()=>({pts:cyc(8,0.16),h:1.2})},
+  {id:'o3',n:8,nick:'長長八角', rest:'diag',amb:true,make:()=>({pts:reg(8,0.5,Math.PI/8),h:2.8})},
+  {id:'c1',n:'c',nick:'罐子',   rest:'up',  make:()=>({r:0.8,h:1.8})},
+  {id:'c2',n:'c',nick:'硬幣',   rest:'lie', make:()=>({r:1.2,h:0.3})},
+  {id:'c3',n:'c',nick:'長棍',   rest:'diag',make:()=>({r:0.28,h:3.2})},
+  {id:'c4',n:'c',nick:'矮胖',   rest:'up',  make:()=>({r:1.1,h:0.95})}
+];
+const VBY=Object.fromEntries(VARIANTS.map(v=>[v.id,v]));
+function buildVariant(v){
+  const g=v.make();let R,s;
+  if(v.n==='c'){R=Math.hypot(g.r,g.h/2);s=1.5/R;const m=cylModel(g.r*s,g.h*s);m.v=v;return m;}
+  const mr=Math.max(...g.pts.map(p=>Math.hypot(p[0],p[1])));R=Math.hypot(mr,g.h/2);s=1.5/R;
+  const m=prismModel(g.pts.map(p=>[p[0]*s,p[1]*s]),g.h*s);m.v=v;return m;
+}
+function poseQ(pose,fixed){
+  const yaw=fixed?-0.55+(rnd()-.5)*0.3:rnd()*Math.PI*2;
+  if(pose==='up')return Q.euler(fixed?0.6:0.5+rnd()*0.25,yaw,0);
+  if(pose==='lie')return Q.euler(fixed?0.45:0.35+rnd()*0.3,yaw,Math.PI/2+(fixed?0:(rnd()-.5)*0.3));
+  return Q.euler(fixed?0.45:0.35+rnd()*0.3,yaw,(fixed?1:(rnd()<.5?1:-1))*(0.8+(fixed?0:rnd()*0.25)));
+}
+
+/* ---------- renderer ---------- */
+const D=14,LIGHT=nrm([0.45,0.6,0.7]);
+const NEUTRAL='#E4ECF6',BASEC='#A56BDC',SIDEC='#F6A24D',GLOW='#F5C518',RED='#E0573C';
+const hex2rgb=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+function drawModel(c,W,H,m,q,opt){
+  opt=opt||{};
+  const f=Math.min(H,W*0.75)*3.6,cx=W/2,cy=H/2;
+  const P=m.verts.map(v=>{const r=Q.rot(q,v),s=f/(D-r[2]);return{x:cx+r[0]*s,y:cy-r[1]*s,r};});
+  const info=m.polys.map(p=>{const n=Q.rot(q,p.n);let ce=[0,0,0];p.idx.forEach(i=>{ce[0]+=P[i].r[0];ce[1]+=P[i].r[1];ce[2]+=P[i].r[2];});ce=ce.map(v=>v/p.idx.length);
+    return{p,n,front:dot(n,[-ce[0],-ce[1],D-ce[2]])>0,z:ce[2]};});
+  info.slice().sort((a,b)=>a.z-b.z).forEach(it=>{
+    if(!it.front)return;
+    let col;
+    if(opt.silhouette)col=[120,132,150];
+    else{const fc=m.faces[it.p.o];let rgb=hex2rgb(fc.col||NEUTRAL);
+      if(fc.glow){const g=hex2rgb(GLOW);rgb=rgb.map((v,i)=>v+(g[i]-v)*0.5);}
+      const fl=opt.flashes&&opt.flashes.find(x=>x.fi===it.p.o);
+      if(fl){const t=(opt.now-fl.t0)/fl.dur,k=fl.dur>1000?0.5*(0.5+0.5*Math.sin(t*Math.PI*6)):0.6*(1-t),g=hex2rgb(fl.col);rgb=rgb.map((v,i)=>v+(g[i]-v)*k);}
+      const lit=0.8+0.28*Math.max(0,dot(it.n,LIGHT));col=rgb.map(v=>Math.min(255,Math.round(v*lit)));}
+    c.beginPath();it.p.idx.forEach((i,k)=>k?c.lineTo(P[i].x,P[i].y):c.moveTo(P[i].x,P[i].y));c.closePath();
+    c.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;c.fill();
+    if(m.faces[it.p.o].curved){c.strokeStyle=c.fillStyle;c.lineWidth=0.9;c.stroke();}
+  });
+  if(!opt.silhouette){
+    const solid=new Path2D(),dsegs=[];
+    m.edges.forEach(([a,b,pa,pb])=>{const A=info[pa],B=info[pb];let k;
+      if(A.p.o===B.p.o){if(A.front!==B.front)k='s';else return;}else k=(A.front||B.front)?'s':'d';
+      if(k==='s'){solid.moveTo(P[a].x,P[a].y);solid.lineTo(P[b].x,P[b].y);}else dsegs.push([a,b]);});
+    /* join hidden edges into chains so short curve segments keep a continuous dash pattern */
+    const dash=new Path2D(),adj=new Map(),usedSeg=new Set();
+    dsegs.forEach((sg,i)=>sg.forEach(v=>{if(!adj.has(v))adj.set(v,[]);adj.get(v).push(i);}));
+    const walk=(start,si)=>{let v=start;dash.moveTo(P[v].x,P[v].y);
+      while(si!==undefined){usedSeg.add(si);const sg=dsegs[si];v=sg[0]===v?sg[1]:sg[0];dash.lineTo(P[v].x,P[v].y);si=(adj.get(v)||[]).find(j=>!usedSeg.has(j));}};
+    adj.forEach((list,v)=>{if(list.length===1&&!usedSeg.has(list[0]))walk(v,list[0]);});
+    dsegs.forEach((sg,i)=>{if(!usedSeg.has(i))walk(sg[0],i);});
+    c.lineJoin='round';c.lineCap='round';c.strokeStyle='#2A3346';
+    if(opt.xray){c.setLineDash([7,5]);c.lineWidth=1.8;c.stroke(dash);c.setLineDash([]);}
+    c.lineWidth=opt.thin?1.6:2.2;c.stroke(solid);
+  }
+  return{P,info};
+}
+function thumb(v,silhouette){
+  const c=document.createElement('canvas');c.width=240;c.height=180;const x=c.getContext('2d');
+  const m=buildVariant(v);
+  if(!silhouette)m.faces.forEach(f=>f.col=f.cap?BASEC:SIDEC);
+  drawModel(x,240,180,m,poseQ(v.rest,true),{silhouette,thin:true,xray:!silhouette});
+  return c.toDataURL('image/png');
+}
+
+/* stage */
+const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage');
+let model=null,viewQ=[0,0,0,1],anim=null,xray=false,canRotate=true,flashes=[],proj=null,W=0,H=0,dpr=1,parts=[];
+function fit(){const r=stage.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);if(r.width<2||r.height<2)return false;
+  if(Math.round(r.width*dpr)!==cv.width||Math.round(r.height*dpr)!==cv.height){cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);}W=r.width;H=r.height;return true;}
+function render(now){
+  if(!model||!fit())return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  if(q&&q.hidden){proj=null;ctx.fillStyle='#93A3B3';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='900 '+Math.round(Math.min(W,H)*0.42)+'px system-ui,sans-serif';ctx.fillText('？',W/2,H/2-10);
+    ctx.font='700 18px "PingFang TC","Noto Sans TC",sans-serif';ctx.fillText('答對了，柱體才會出現！',W/2,H/2+Math.min(W,H)*0.3);}
+  else proj=drawModel(ctx,W,H,model,viewQ,{xray,flashes,now});
+  parts=parts.filter(p=>p.life>0);
+  parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.25;p.life-=1;p.rot+=p.vr;
+    ctx.save();ctx.globalAlpha=Math.min(1,p.life/20);ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillStyle=p.col;
+    if(p.star){ctx.beginPath();for(let i=0;i<10;i++){const r=i%2?p.s*0.45:p.s,a=i*Math.PI/5;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);}ctx.fill();}
+    else ctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);
+    ctx.restore();});
+}
+function burst(x,y,n,star){const cols=['#F5C518','#F25C54','#2BB3A3','#A56BDC','#F6A24D','#3E9BE0'];
+  for(let i=0;i<n;i++){const a=rnd()*Math.PI*2,sp=2+rnd()*5;parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,life:40+rnd()*25,col:pick(cols),s:star?7+rnd()*5:8+rnd()*6,star,rot:rnd()*6,vr:(rnd()-.5)*.3});}}
+function pickAt(x,y){
+  if(!proj)return -1;
+  const cands=proj.info.filter(i=>i.front).sort((a,b)=>b.z-a.z);
+  for(const it of cands){const pts=it.p.idx.map(i=>proj.P[i]);let inside=false;
+    for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if(((a.y>y)!==(b.y>y))&&(x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x))inside=!inside;}
+    if(inside)return it.p.o;}
+  return -1;
+}
+const worldN=fi=>Q.rot(viewQ,model.faces[fi].normal);
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function rotateTo(q){if(reduced){viewQ=q;return;}anim={from:viewQ.slice(),to:q,t0:performance.now(),dur:800};}
+function flash(fi,col,dur){flashes=flashes.filter(x=>x.fi!==fi);flashes.push({fi,col,t0:performance.now(),dur});}
+function showAxisSideways(){const fi=q&&q.basePair?q.basePair[0]:0;const n=worldN(fi);rotateTo(Q.norm(Q.mul(Q.fromUnit(n,nrm([0.93,0.2,0.32])),viewQ)));}
+
+/* page-level confetti */
+const fx=$('#fx'),fctx=fx.getContext('2d');let fparts=[];
+function confetti(n){fx.width=innerWidth*dpr;fx.height=innerHeight*dpr;
+  for(let i=0;i<n;i++)fparts.push({x:innerWidth*rnd(),y:-20-rnd()*innerHeight*0.4,vx:(rnd()-.5)*2,vy:2+rnd()*3,life:160+rnd()*60,col:pick(['#F5C518','#F25C54','#2BB3A3','#A56BDC','#F6A24D','#3E9BE0']),s:8+rnd()*6,rot:rnd()*6,vr:(rnd()-.5)*.2});}
+function loop(now){
+  if(anim){const t=Math.min(1,(now-anim.t0)/anim.dur),e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;viewQ=Q.slerp(anim.from,anim.to,e);if(t>=1)anim=null;}
+  flashes=flashes.filter(fl=>now-fl.t0<fl.dur);
+  if(!$('#play').hidden)render(now);
+  if(fparts.length){fctx.setTransform(dpr,0,0,dpr,0,0);fctx.clearRect(0,0,innerWidth,innerHeight);
+    fparts=fparts.filter(p=>p.life>0&&p.y<innerHeight+30);
+    fparts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life--;p.rot+=p.vr;fctx.save();fctx.translate(p.x,p.y);fctx.rotate(p.rot);fctx.fillStyle=p.col;fctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);fctx.restore();});
+    if(!fparts.length)fctx.clearRect(0,0,innerWidth,innerHeight);}
+  requestAnimationFrame(loop);
+}
+
+/* pointer */
+let down=null,dragging=false;
+stage.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY};dragging=false;try{stage.setPointerCapture(e.pointerId);}catch(_){}});
+stage.addEventListener('pointermove',e=>{
+  if(!down)return;
+  if(!dragging&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>8){dragging=true;anim=null;}
+  if(dragging&&canRotate){const dx=e.clientX-down.lx,dy=e.clientY-down.ly;viewQ=Q.norm(Q.mul(Q.axis([1,0,0],dy*0.011),Q.mul(Q.axis([0,1,0],dx*0.011),viewQ)));}
+  down.lx=e.clientX;down.ly=e.clientY;
+});
+stage.addEventListener('pointerup',e=>{
+  if(down&&!dragging){const r=stage.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,fi=pickAt(x,y);if(fi>=0)onFaceTap(fi,x,y);}
+  down=null;dragging=false;
+});
+stage.addEventListener('pointercancel',()=>{down=null;dragging=false;});
+/* iPad: stop the page scrolling while a finger drags on the stage (e.g. inside PowerLesson 2) */
+stage.addEventListener('touchmove',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+['gesturestart','gesturechange'].forEach(t=>stage.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+
+/* =====================================================================
+   Monsters
+   ===================================================================== */
+const MONSTERS=[
+  {name:'方方怪',col:'#7BC67E',body:'<rect x="18" y="20" width="84" height="74" rx="14"/>',horn:'<path d="M30 22 L24 4 L42 18 Z M90 22 L96 4 L78 18 Z"/>'},
+  {name:'尖尖怪',col:'#6FA8DC',body:'<path d="M60 4 L110 96 L10 96 Z" stroke-linejoin="round"/>',horn:''},
+  {name:'圓筒怪',col:'#F6B26B',body:'<path d="M20 26 Q60 6 100 26 L100 86 Q60 106 20 86 Z"/>',horn:'<ellipse cx="60" cy="24" rx="40" ry="10" fill="#fff" opacity=".35"/>'},
+  {name:'六角怪',col:'#B4A7D6',body:'<path d="M34 10 L86 10 L112 54 L86 98 L34 98 L8 54 Z" stroke-linejoin="round"/>',horn:'<path d="M50 10 L60 -6 L70 10 Z"/>'},
+  {name:'柱體大魔王',col:'#F1C232',body:'<path d="M14 98 L14 30 L36 50 L60 14 L84 50 L106 30 L106 98 Z" stroke-linejoin="round"/>',horn:'<circle cx="60" cy="12" r="6" fill="#F25C54"/><circle cx="14" cy="28" r="5" fill="#2BB3A3"/><circle cx="106" cy="28" r="5" fill="#2BB3A3"/>'},
+  {name:'終極魔王',col:'#8E5CC9',body:'<path d="M8 100 L8 26 L32 46 L46 10 L60 34 L74 10 L88 46 L112 26 L112 100 Z" stroke-linejoin="round"/>',horn:'<circle cx="46" cy="10" r="6" fill="#F5C518"/><circle cx="74" cy="10" r="6" fill="#F5C518"/><path d="M24 100 L24 86 L96 86 L96 100" fill="#F5C518"/>'}
+];
+function monsterSVG(i,cls){
+  const M=MONSTERS[i];
+  return `<svg viewBox="0 0 120 110" aria-hidden="true"><g class="monster ${cls||''}">
+    <g fill="${M.col}" stroke="#1E2938" stroke-width="3">${M.body}</g><g fill="${M.col}" stroke="#1E2938" stroke-width="2.5">${M.horn}</g>
+    <g class="eyes"><circle cx="46" cy="56" r="10" fill="#fff" stroke="#1E2938" stroke-width="2"/><circle cx="74" cy="56" r="10" fill="#fff" stroke="#1E2938" stroke-width="2"/>
+      <circle cx="48" cy="58" r="4.5" fill="#1E2938"/><circle cx="76" cy="58" r="4.5" fill="#1E2938"/></g>
+    <g class="eyes-x" stroke="#1E2938" stroke-width="3.5" stroke-linecap="round"><path d="M39 49 L53 63 M53 49 L39 63 M67 49 L81 63 M81 49 L67 63"/></g>
+    <path class="mouth" d="M46 76 Q60 86 74 76" fill="none" stroke="#1E2938" stroke-width="3" stroke-linecap="round"/>
+    <path class="mouth-open" d="M44 74 Q60 96 76 74 Z" fill="#7A1F1F" stroke="#1E2938" stroke-width="2.5" stroke-linejoin="round"/>
+  </g></svg>`;
+}
+const heartSVG=`<svg class="heart" viewBox="0 0 24 22"><path d="M12 20 C4 14 1 10 1 6.5 C1 3.5 3.4 1.5 6.2 1.5 C8.4 1.5 10.4 2.8 12 5 C13.6 2.8 15.6 1.5 17.8 1.5 C20.6 1.5 23 3.5 23 6.5 C23 10 20 14 12 20 Z"/></svg>`;
+const TAUNT=['嘻嘻，你認得出我的柱體嗎？','我把柱體翻來翻去，你找不到的！','哈哈，看你怎樣找！'];
+const LAUGH=['嘻嘻，錯啦！','哈哈，再想想！','抓不到我！','嘿嘿嘿～'];
+const OUCH=['哎呀！','好痛！','嗚…','不要啊！'];
+
+/* =====================================================================
+   Levels: fixed questions that follow the textbook (P.68–74) and workbook (P.26–27),
+   easy to hard inside each level. All shapes are drawn in perspective with dashed hidden edges.
+   ===================================================================== */
+/* Each question slot keeps one question type and difficulty; a replay picks one of the listed prisms for it. */
+/* objects for the sorting question (習作 P.26 第 1、2 題) */
+const OBJECTS=[
+  {name:'牛奶罐',v:'c1',pose:'up',col:'#EAF2FF',t:'cyl'},
+  {name:'果汁糖盒',v:'q2',pose:'up',col:'#F6B26B',t:'prism'},
+  {name:'朱古力',v:'t3',pose:'lie',col:'#F5D04A',t:'prism'},
+  {name:'曲奇餅罐',v:'o1',pose:'up',col:'#E06666',t:'prism'},
+  {name:'杏仁餅罐',v:'c4',pose:'up',col:'#F6D365',t:'cyl'},
+  {name:'餅乾盒',v:'q3',pose:'up',col:'#F4CCCC',t:'prism'},
+  {name:'鉛筆',v:'h2',pose:'diag',col:'#FFD966',t:'prism'},
+  {name:'硬幣',v:'c2',pose:'up',col:'#D9D9D9',t:'cyl'},
+  {name:'薯片筒',v:'c3',pose:'diag',col:'#93C47D',t:'cyl'},
+  {name:'門擋',v:'t2',pose:'lie',col:'#A4C2F4',t:'prism'}
+];
+/* true / false statements */
+const TFS=[
+  {s:'柱體的底一定在下面。',a:false,why:'底是一模一樣、面對面的兩個面。柱體躺下時，底就在左右兩邊。',v:'p6',pose:'lie'},
+  {s:'三角柱體的側面都是三角形。',a:false,why:'三角柱體的底是三角形，側面都是長方形。',v:'t1',pose:'up'},
+  {s:'正方體和長方體都是四角柱體。',a:true,why:'它們的底是四邊形，所以都是四角柱體。',v:'q2',pose:'up'},
+  {s:'圓柱體有 3 個面，其中 1 個是曲面。',a:true,why:'圓柱體有 2 個圓形的底，加 1 個曲面的側面。',v:'c1',pose:'up'},
+  {s:'五角柱體有 5 個面。',a:false,why:'五角柱體有 5 個側面，加 2 個底，共 7 個面。',v:'p1',pose:'up'},
+  {s:'角柱的 2 個底，形狀和大小都相同。',a:true,why:'這是柱體的特點：2 個底一模一樣、面對面。',v:'q1',pose:'up'},
+  {s:'六角柱體有 6 個側面。',a:true,why:'底有 6 條邊，就有 6 個側面。',v:'h4',pose:'up'},
+  {s:'圓柱體的側面是長方形。',a:false,why:'圓柱體的側面是一個彎彎的曲面。',v:'c3',pose:'diag'}
+];
+const S=(task,list,extra)=>list.map(([v,pose])=>Object.assign({v,pose,task},extra||{}));
+const RID=(v,prompt,h1,h2)=>({v,pose:'up',task:'name',hidden:true,prompt,hints:[h1,h2]});
+const LEVELS=[
+  {t:'底在哪裏', tag:'找底', rot:true, reward:'四角柱體城牆',
+   intro:'柱體有 2 個一模一樣、面對面的<span class="b">底</span>。先點出 2 個底，再選出底的形狀。<b>虛線</b>是躲起來的邊。',
+   qs:[
+    S('base',[['t1','up'],['p1','up'],['c4','up']]),          // 直立（課本 P.69–71）
+    S('base',[['q1','up'],['q6','up'],['t5','up']]),          // 直立，底較特別（課本 P.70 梯形底）
+    S('base',[['c1','lie'],['c2','lie'],['t2','lie']]),       // 躺下（課本 P.71 橫放圓柱）
+    S('base',[['p6','lie'],['q1','lie'],['t1','lie']]),       // 躺下（課本 P.70 躺下的五角柱）
+    S('base',[['t3','diag'],['p3','diag'],['c3','diag']])     // 斜放（練習 P.74 第 4 題）
+   ]},
+  {t:'圍一圈', tag:'找側面', rot:true, counter:true, reward:'四角柱體塔樓',
+   intro:'點出所有<span class="s">側面</span>。上面會告訴你還差幾個。',
+   qs:[
+    S('side',[['t2','up'],['t1','up'],['t5','up']]),          // 3 個側面
+    S('side',[['q6','up'],['q1','up'],['p4','up']]),          // 4–5 個側面
+    S('side',[['c4','up'],['c1','up']]),                      // 圓柱：1 個曲面
+    S('side',[['p1','lie'],['p6','lie'],['t1','lie']]),       // 躺下
+    S('side',[['q5','diag'],['t3','diag'],['p3','diag']])     // 斜放
+   ]},
+  {t:'側面捉迷藏', tag:'找側面', rot:true, counter:false, reward:'圓柱體塔樓',
+   intro:'這次不告訴你還差幾個！有些側面躲在後面，找齊了就按「我找齊了」。',
+   qs:[
+    S('side',[['p2','lie'],['q6','lie'],['t2','lie']]),       // 躺下
+    S('side',[['h4','up'],['h3','up'],['h1','up']]),          // 六角柱（習作 P.27 第 8 題）
+    S('side',[['c3','diag'],['c2','lie'],['c1','diag']]),     // 圓柱
+    S('side',[['s1','lie'],['s1','diag']]),                   // 七角柱
+    S('side',[['o1','up'],['o2','up'],['o3','diag']])         // 八角柱（課本 P.71 動動腦）
+   ]},
+  {t:'叫甚麼名字', tag:'名稱', rot:true, reward:'六角柱體主樓',
+   intro:'先找出底，看看是甚麼形狀，再用下面的字拼出名稱。',
+   qs:[
+    S('name',[['p1','up'],['t1','up'],['q1','up']]),          // 習作 P.26 第 3 題
+    S('name',[['c1','lie'],['c4','diag'],['c2','lie']]),      // 習作 P.26 第 4 題
+    S('name',[['t5','lie'],['t2','diag'],['t3','diag']]),     // 不規則或斜放的三角柱
+    S('name',[['q6','diag'],['q5','diag'],['p6','diag']]),    // 不規則四角柱、斜放五角柱
+    S('name',[['h3','up'],['s1','up'],['o2','up']])           // 六至八角柱
+   ]},
+  {t:'紙上挑戰', tag:'混合', rot:false, reward:'小塔和旗幟',
+   intro:'大魔王把柱體變成書本上的圖，不能轉動了！看清楚<b>虛線</b>，再作答。',
+   qs:[
+    S('classify',[['h2','diag'],['p3','diag'],['q4','up']]),  // 課本 P.68 角柱
+    S('classify',[['c2','up'],['c3','diag'],['c4','lie']]),   // 課本 P.68 圓柱
+    S('sideShape',[['q4','up'],['h4','up'],['p1','up']]),     // 習作 P.27 第 5 題
+    S('baseShape',[['t1','lie'],['p6','lie'],['h3','lie']]),  // 習作 P.27 第 6 題
+    S('faces',[['q3','up'],['t1','up'],['p1','up']]),         // 練習 P.74 第 5 題
+    [RID('c1','有一個柱體，它有 3 個面，其中 1 個是曲面。它叫甚麼名字？','想一想：哪一種柱體有彎彎的曲面？','圓柱體有 2 個圓形的底和 1 個曲面，共 3 個面。'),
+     RID('t1','有一個柱體，共有 5 個面，2 個底是相同的三角形。它叫甚麼名字？','柱體的名稱看底的形狀。','底是三角形，就叫三角柱體。'),
+     RID('p1','有一個角柱，它共有 7 個面。它叫甚麼名字？','7 個面裏面，有 2 個是底。側面有幾個？','側面有 5 個，底就有 5 條邊，是五邊形。')],   // 習作 P.27 第 7 題
+    [RID('o2','哪一種角柱有 8 個側面？','角柱的名稱看底的形狀：底有幾條邊，就有幾個側面。','8 個側面，底就有 8 條邊，是八邊形。'),
+     RID('h4','哪一種角柱有 6 個側面？','角柱的名稱看底的形狀：底有幾條邊，就有幾個側面。','6 個側面，底就有 6 條邊，是六邊形。'),
+     RID('s1','哪一種角柱有 7 個側面？','角柱的名稱看底的形狀：底有幾條邊，就有幾個側面。','7 個側面，底就有 7 條邊，是七邊形。')]  // 課本 P.71 動動腦
+   ]},
+  {t:'終極挑戰', tag:'終極關卡', rot:false, final:true, reward:'金色皇冠',
+   intro:'你集齊了城堡！終極魔王來搶城堡了。題目像習作一樣，有些更難，加油！',
+   qs:[
+    [{v:'sort',task:'sort'}],                                                         // 習作 P.26 第 1、2 題
+    S('name',[['p1','up'],['c1','lie'],['h4','up'],['t5','lie']]),                     // 習作 P.26 第 3、4 題
+    S('sideShape',[['q4','up'],['p1','up'],['h4','up']]),                             // 習作 P.27 第 5 題
+    S('baseShape',[['t1','lie'],['p6','lie'],['q1','lie'],['h3','lie']]),              // 習作 P.27 第 6 題
+    TFS.map(t=>({task:'tf',v:t.v,pose:t.pose,stmt:t.s,ans:t.a,why:t.why})),         // 判斷對錯
+    [RID('c1','有一個柱體，它有 3 個面，其中 1 個是曲面。它叫甚麼名字？','想一想：哪一種柱體有彎彎的曲面？','圓柱體有 2 個圓形的底和 1 個曲面，共 3 個面。'),
+     RID('t1','有一個柱體，共有 5 個面，2 個底是相同的三角形。它叫甚麼名字？','柱體的名稱看底的形狀。','底是三角形，就叫三角柱體。'),
+     RID('p1','有一個角柱，它共有 7 個面。它叫甚麼名字？','7 個面裏面，有 2 個是底。側面有幾個？','側面有 5 個，底就有 5 條邊，是五邊形。')], // 習作 P.27 第 7 題
+    S('fill',[['h4','up'],['p1','up'],['o2','up'],['s1','up']]),                      // 習作 P.27 第 8 題
+    [RID('o2','一個角柱共有 10 個面。它叫甚麼名字？','10 個面裏面，有 2 個是底。側面有幾個？','10 − 2 = 8 個側面，底有 8 條邊，是八邊形。'),
+     RID('h4','一個角柱共有 8 個面。它叫甚麼名字？','8 個面裏面，有 2 個是底。側面有幾個？','8 − 2 = 6 個側面，底有 6 條邊，是六邊形。'),
+     RID('s1','一個角柱共有 9 個面。它叫甚麼名字？','9 個面裏面，有 2 個是底。側面有幾個？','9 − 2 = 7 個側面，底有 7 條邊，是七邊形。'),
+     {v:'o2',pose:'up',task:'faces',hidden:true,prompt:'八角柱體共有幾個面？',hints:['八角柱體有幾個側面？再加上 2 個底。','8 個側面 + 2 個底 = 幾個面？']}]  // 動動腦（更難）
+   ]}
+];
+function planLevel(Lv){ // one prism per slot, no prism twice in a level when there is a choice
+  const used=new Set();
+  return Lv.qs.map((slot,si)=>{const fresh=slot.filter(x=>!used.has(x.v));const s=pick(fresh.length?fresh:slot);used.add(s.v);return Object.assign({},s,{slot:si});});
+}
+const KEY='prism-castle-v3';
+let save={stars:LEVELS.map(()=>0),coins:0,album:[],sound:true},unlockAll=false;
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){
+  if(Array.isArray(s.stars))save.stars=LEVELS.map((_,i)=>Math.max(0,Math.min(3,+s.stars[i]||0)));
+  save.coins=Math.max(0,+s.coins||0);if(Array.isArray(s.album))save.album=s.album.filter(id=>VBY[id]);save.sound=s.sound!==false;}}catch(_){}
+soundOn=save.sound;
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(save));}catch(_){}}
+const castleDone=()=>LEVELS.every((Lv,i)=>Lv.final||save.stars[i]>0);
+const unlocked=i=>unlockAll||i===0||(LEVELS[i].final?castleDone():save.stars[i-1]>0);
+function showCoins(){document.querySelectorAll('.coins span').forEach(s=>s.textContent=save.coins);}
+
+/* =====================================================================
+   Castle + home
+   ===================================================================== */
+function prismSVG(cx,yTop,r,h,n,rot,sx,fill,ghost,cls){
+  const top=[],bot=[];
+  for(let i=0;i<n;i++){const a=rot+i*2*Math.PI/n,x=cx+r*Math.cos(a)*sx,y=yTop+r*Math.sin(a)*0.38;top.push([x,y]);bot.push([x,y+h]);}
+  const pts=a=>a.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const st=ghost?'fill="none" stroke="#93A3B3" stroke-width="1.6" stroke-dasharray="5 4"':`fill="${fill}" stroke="#2A3346" stroke-width="1.6" stroke-linejoin="round"`;
+  let s=`<g class="${cls||''}">`;
+  for(let i=0;i<n;i++){const j=(i+1)%n,mid=rot+(i+.5)*2*Math.PI/n;if(Math.sin(mid)<=0.0001)continue;
+    s+=`<polygon points="${pts([top[i],top[j],bot[j],bot[i]])}" ${st}/>`;
+    if(!ghost)s+=`<polygon points="${pts([top[i],top[j],bot[j],bot[i]])}" fill="#000" opacity="${((1-Math.cos(mid))*0.09).toFixed(2)}"/>`;}
+  s+=`<polygon points="${pts(top)}" ${st}/>`;if(!ghost)s+=`<polygon points="${pts(top)}" fill="#fff" opacity=".35"/>`;
+  return s+'</g>';
+}
+function cylSVG(cx,yTop,r,h,fill,ghost,cls){
+  const ry=r*0.38,st=ghost?'fill="none" stroke="#93A3B3" stroke-width="1.6" stroke-dasharray="5 4"':`fill="${fill}" stroke="#2A3346" stroke-width="1.6"`;
+  return `<g class="${cls||''}"><path d="M${cx-r},${yTop} L${cx-r},${yTop+h} A${r},${ry} 0 0 0 ${cx+r},${yTop+h} L${cx+r},${yTop} Z" ${st}/>`+
+    (ghost?'':`<path d="M${cx+r*0.35},${yTop+ry*0.95} L${cx+r*0.35},${yTop+h+ry*0.95} A${r},${ry} 0 0 0 ${cx+r},${yTop+h} L${cx+r},${yTop} Z" fill="#000" opacity=".1"/>`)+
+    `<ellipse cx="${cx}" cy="${yTop}" rx="${r}" ry="${ry}" ${st}/>`+(ghost?'':`<ellipse cx="${cx}" cy="${yTop}" rx="${r}" ry="${ry}" fill="#fff" opacity=".35"/>`)+'</g>';
+}
+function drawCastle(newIdx){
+  const has=i=>save.stars[i]>0,cls=i=>i===newIdx?'pop':'';
+  let s=`<ellipse cx="200" cy="232" rx="190" ry="16" fill="#BFDDB0"/>`;
+  s+=prismSVG(200,165,74,52,4,Math.PI/4,2.1,'#F2D39B',!has(0),cls(0));
+  s+=prismSVG(80,100,36,118,4,Math.PI/4,1,'#8FB8DE',!has(1),cls(1));
+  s+=cylSVG(320,100,30,120,'#7FC8B6',!has(2),cls(2));
+  s+=prismSVG(200,98,42,62,6,0,1,'#E8957F',!has(3),cls(3));
+  s+=`<g class="${cls(4)}">`+prismSVG(80,68,26,30,8,0,1,'#B39DDB',!has(4),'')+prismSVG(320,74,22,24,5,-Math.PI/2,1,'#F6C453',!has(4),'')+
+    (has(4)?`<line x1="200" y1="96" x2="200" y2="30" stroke="#2A3346" stroke-width="2.5"/><polygon points="200,30 236,40 200,50" fill="#F25C54" stroke="#2A3346" stroke-width="1.6"/>`
+           :`<line x1="200" y1="96" x2="200" y2="30" stroke="#93A3B3" stroke-width="1.6" stroke-dasharray="5 4"/>`)+'</g>';
+  if(has(5))s+=`<g class="${cls(5)}"><polygon points="176,96 182,74 192,86 200,66 208,86 218,74 224,96" fill="#F5C518" stroke="#2A3346" stroke-width="1.6" stroke-linejoin="round"/>
+    <circle cx="200" cy="64" r="4" fill="#F25C54" stroke="#2A3346" stroke-width="1.2"/><text x="200" y="24" text-anchor="middle" font-size="18" font-weight="900" fill="#C98A00">柱體大師</text></g>`;
+  $('#castle').innerHTML=s;
+}
+function renderHome(newIdx){
+  drawCastle(newIdx);showCoins();
+  $('#soundBtn').textContent=soundOn?'聲音：開':'聲音：關';
+  const firstOpen=LEVELS.findIndex((_,i)=>save.stars[i]===0&&unlocked(i));
+  $('#levels').innerHTML=LEVELS.map((L,i)=>{
+    const lock=!unlocked(i),beat=save.stars[i]>0,tc=L.tag==='找底'?'t-base':L.tag==='找側面'?'t-side':'';const lvNo=L.final?'終極關卡':`第 ${i+1} 關`;
+    return `<button class="lv${L.final?' lv-final':''}${lock?' locked':''}${beat?' beaten':''}${i===firstOpen?' lv-next':''}" type="button" data-i="${i}">
+      <span class="mini">${monsterSVG(i)}</span><span class="no">${lvNo}・${MONSTERS[i].name}</span><span class="tt">${L.t}</span>
+      <span class="row"><span class="tag ${tc}">${L.tag}</span><span class="stars">${'<b>★</b>'.repeat(save.stars[i])}${'★'.repeat(3-save.stars[i])}</span></span></button>`;
+  }).join('');
+}
+$('#levels').addEventListener('click',e=>{const b=e.target.closest('.lv');if(!b)return;const i=+b.dataset.i;if(!unlocked(i)){SFX.bad();if(LEVELS[i].final){const st=$('.story');st.innerHTML='先打敗前面 5 隻搗蛋怪、集齊城堡，終極關卡才會開啟！';}return;}SFX.tap();startLevel(i);});
+$('#unlockBtn').addEventListener('click',()=>{unlockAll=!unlockAll;$('#unlockBtn').textContent=unlockAll?'老師：取消解鎖':'老師：全部解鎖';renderHome();});
+let resetArm=false;
+$('#resetBtn').addEventListener('click',()=>{
+  if(!resetArm){resetArm=true;$('#resetBtn').textContent='再按一次確認重設';setTimeout(()=>{resetArm=false;$('#resetBtn').textContent='重設進度';},3000);return;}
+  save={stars:LEVELS.map(()=>0),coins:0,album:[],sound:soundOn};persist();resetArm=false;$('#resetBtn').textContent='重設進度';renderHome();
+});
+$('#soundBtn').addEventListener('click',()=>{soundOn=!soundOn;save.sound=soundOn;persist();renderHome();SFX.tap();});
+
+/* album */
+const thumbCache={};
+$('#albumBtn').addEventListener('click',()=>{
+  SFX.tap();
+  const got=new Set(save.album);
+  const groups=[3,4,5,6,7,8,'c'];
+  const USED=new Set(LEVELS.flatMap(L=>L.qs.flat().map(x=>x.v)));const LIST=VARIANTS.filter(v=>USED.has(v.id));
+  $('#ovCard').classList.add('album');
+  $('#ovCard').innerHTML=`<h2>柱體圖鑑</h2><p>已收集 <b>${LIST.filter(v=>got.has(v.id)).length}</b> / ${LIST.length} 張。答對題目，就會收集到那個柱體。</p>
+    <div class="album-grid">${groups.map(n=>LIST.filter(v=>v.n===n).map(v=>{
+      const k=v.id+(got.has(v.id)?'':'-s');if(!thumbCache[k])thumbCache[k]=thumb(v,!got.has(v.id));
+      return `<div class="card ${got.has(v.id)?'got':'lock'}"><img src="${thumbCache[k]}" alt=""><span class="ty">${got.has(v.id)?typeName(v.n):'？？？'}</span><span>${got.has(v.id)?v.nick:'未收集'}</span></div>`;}).join('')).join('')}</div>
+    <button class="big" type="button" id="albumClose">關閉</button>`;
+  $('#overlay').hidden=false;
+  $('#albumClose').addEventListener('click',()=>{$('#overlay').hidden=true;$('#ovCard').classList.remove('album');});
+});
+
+/* =====================================================================
+   Level flow
+   ===================================================================== */
+let L=null,li=0,qi=0,NQ=5,scores=[],q=null,combo=0,hp=5,earned=0,newCards=[],lives=8,maxLives=8,failing=false;
+
+function startLevel(i){
+  li=i;L=LEVELS[i];L.plan=planLevel(L);NQ=L.plan.length;qi=0;scores=[];combo=0;hp=NQ;earned=0;newCards=[];maxLives=lives=NQ+3;failing=false;$('#play').classList.remove('cool');renderLives();
+  $('#home').hidden=true;$('#play').hidden=false;
+  $('#lvName').innerHTML=`<small>${L.final?'終極關卡':`第 ${i+1} 關`}</small>${L.t}`;
+  canRotate=L.rot;
+  $('#stageHint').textContent=L.rot?'拖動：轉一轉　輕點：選一個面':'這一關不能轉動';
+  $('#mArt').innerHTML=monsterSVG(i,'idle');$('#mName').textContent=MONSTERS[i].name;
+  renderHearts();setTalk(pick(TAUNT));showCombo();showCoins();
+  newQuestion(true);
+}
+function renderLives(lost){$('#lives').innerHTML='勇氣 '+Array.from({length:maxLives},(_,k)=>heartSVG.replace('class="heart"',`class="heart${k>=lives?' gone':''}${k===lost?' lose':''}"`)).join('');}
+function renderHearts(lost){$('#hearts').innerHTML=Array.from({length:NQ},(_,k)=>heartSVG.replace('class="heart"',`class="heart${k>=hp?' gone':''}${k===lost?' lose':''}"`)).join('');}
+function setTalk(t){$('#mTalk').textContent=t;}
+function monsterState(cls,ms){const g=document.querySelector('#mArt .monster');if(!g)return;g.setAttribute('class','monster '+cls);
+  if(ms)setTimeout(()=>{if(g.isConnected&&hp>0)g.setAttribute('class','monster idle');},ms);}
+function popText(cls,txt,parent){const s=document.createElement('span');s.className='pop-txt '+cls;s.textContent=txt;(parent||$('#mbox')).appendChild(s);setTimeout(()=>s.remove(),1000);}
+function showCombo(bump){const c=$('#combo');c.textContent=combo>=2?`連擊 ×${combo}`:'';if(bump&&combo>=2){c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump');}}
+
+const DEFAULT_SAY={base:'轉一轉，找出 2 個<span class="b">底</span>。',side:'找出所有<span class="s">側面</span>。',name:'它叫甚麼名字？',
+  classify:'它有沒有彎彎的曲面？',sort:'點一點每個物件，看看它有沒有彎彎的曲面。',fill:'一格一格填，先看看底的形狀。',tf:'想清楚才作答，只有一次機會！',sideShape:'側面在哪裏？',baseShape:'找找一模一樣、面對面的兩個面。',faces:'記得數躲起來的面。'};
+function newQuestion(first){
+  const spec=L.plan[qi];
+  if(spec.task==='sort'){
+    const cyl=shuffle(OBJECTS.filter(o=>o.t==='cyl')),pr=shuffle(OBJECTS.filter(o=>o.t==='prism'));
+    const nC=2+Math.floor(rnd()*2);spec.items=shuffle([...cyl.slice(0,nC),...pr.slice(0,6-nC)]);
+  }
+  const v=VBY[spec.task==='sort'?spec.items[0].v:spec.v];
+  model=buildVariant(v);
+  viewQ=poseQ(spec.task==='sort'?spec.items[0].pose:spec.pose,true);anim=null;flashes=[];parts=[];xray=true;
+  q={spec,v,task:spec.task,k:v.n,hidden:!!spec.hidden,startQ:viewQ.slice(),noAlbum:spec.task==='sort'};
+  resetQ();
+  say(first?L.intro:q.hidden?'想一想，再用下面的字輸入名稱。':DEFAULT_SAY[q.task]);
+}
+function resetQ(){
+  Object.assign(q,{mistakes:0,m2:0,done:false,busy:false,picks:[],found:new Set(),input:'',tried:new Set(),nameOk:false,basePair:null,stage:1,hidden:!!q.spec.hidden,
+    sub:0,fillv:[],missed:[],failed:false,assign:[],badSet:null});
+  model.faces.forEach(f=>{f.col=NEUTRAL;f.glow=false;});
+  if(q.task==='sort')showObj(0);
+  $('#xtag').hidden=q.hidden;
+  $('#nextBtn').hidden=true;$('#retryBtn').hidden=true;
+  renderTask();
+}
+const totalSides=()=>model.faces.filter(f=>!f.cap).length;
+const answerName=()=>q.k==='c'?'圓柱':CN[q.k]+'角柱';
+const baseKey=()=>q.k==='c'?'circle':'p'+q.k;
+function nearShapes(k){ // two neighbouring base shapes for distractors
+  if(k==='c')return['p3','p5'];
+  const a=k===3?'p5':'p'+(k-1),b=k>=6?'p'+(k-2):'p'+(k+1);return[a,b];
+}
+
+function renderTask(){
+  const t=q.task,c=$('#controls');
+  $('#redoBtn').hidden=!(t==='side'||t==='name'||(t==='fill'&&FILL[q.sub]==='name')||(t==='base'&&q.stage===1));
+  if(t==='base'&&q.stage===1){
+    $('#prompt').innerHTML='點出這個柱體的 2 個<span class="b">底</span>。';
+    c.innerHTML=`<div class="picked" id="picked"></div>`;
+  }else if(t==='base'&&q.stage===2){
+    $('#prompt').innerHTML='找到了！這兩個<span class="b">底</span>是甚麼形狀？';
+    showOpts(shuffle([baseKey(),'rect',...nearShapes(q.k)]),baseKey(),true);
+  }else if(t==='side'){
+    $('#prompt').innerHTML='點出這個柱體所有的<span class="s">側面</span>。';
+    c.innerHTML=L.counter?`<div class="counter" id="counter"></div>`:`<div class="counter" id="counter"></div><button class="big" id="doneBtn" type="button">我找齊了</button>`;
+    if(!L.counter)$('#doneBtn').addEventListener('click',sideDone);
+  }else if(t==='name'){
+    $('#prompt').innerHTML=q.spec.prompt||'這個立體圖形叫甚麼名字？';
+    const keys=['一','二','三','四','五','六','七','八','九','十','角','柱','體','圓','錐','球'];
+    c.innerHTML=`<div class="namebox" id="namebox"></div>
+      <div class="keys">${keys.map(ch=>`<button class="key${'角柱體圓錐球'.includes(ch)?' word':''}" type="button" data-ch="${ch}">${ch}</button>`).join('')}
+      <button class="key fn" type="button" data-fn="del">⌫ 刪除</button><button class="key fn" type="button" data-fn="clr">清除</button></div>
+      <button class="big" type="button" id="okBtn">確定</button>`;
+    c.querySelector('.keys').addEventListener('click',e=>{const b=e.target.closest('.key');if(!b||q.done)return;SFX.tap();
+      if(b.dataset.fn==='del')q.input=q.input.slice(0,-1);else if(b.dataset.fn==='clr')q.input='';else if(q.input.length<5)q.input+=b.dataset.ch;renderName();});
+    $('#okBtn').addEventListener('click',checkName);
+  }else if(t==='classify'){
+    $('#prompt').innerHTML='這個柱體是<b>角柱</b>還是<b>圓柱</b>？';
+    showOpts(['prism','cyl'],q.k==='c'?'cyl':'prism');
+  }else if(t==='sideShape'){
+    $('#prompt').innerHTML=`以下哪一個是這個${typeName(q.k)}的<span class="s">側面</span>？`;
+    showOpts(shuffle(['circle','para','rect','p3']),'rect');
+  }else if(t==='baseShape'){
+    $('#prompt').innerHTML=`以下哪一個是這個${typeName(q.k)}的<span class="b">底</span>？`;
+    showOpts(shuffle([baseKey(),'rect',...nearShapes(q.k)]),baseKey(),true);
+  }else if(t==='sort'){
+    $('#prompt').innerHTML='下面物件的外形像<b>角柱</b>還是<b>圓柱</b>？點一點每個物件，選出答案。';
+    c.innerHTML=`<div class="sortgrid">${q.spec.items.map((it,i)=>{const a=q.assign[i];
+      return `<button class="scard${q.badSet&&q.badSet.has(i)?' bad':''}${q.done&&a===it.t?' ok':''}" type="button" data-i="${i}"><img src="${objThumb(it)}" alt=""><span>${it.name}</span><span class="chip ${a||''}">${a==='prism'?'角柱':a==='cyl'?'圓柱':'未選'}</span></button>`;}).join('')}</div>
+      <button class="big" type="button" id="sortOk">確定</button>`;
+    c.querySelector('.sortgrid').addEventListener('click',e=>{const b=e.target.closest('.scard');if(!b||q.done)return;const i=+b.dataset.i;SFX.tap();
+      q.assign[i]=q.assign[i]==='prism'?'cyl':'prism';if(q.badSet)q.badSet.delete(i);showObj(i);renderTask();});
+    $('#sortOk').addEventListener('click',checkSort);
+  }else if(t==='tf'){
+    $('#prompt').innerHTML='這句話對嗎？';
+    showOpts(['T','F'],q.spec.ans?'T':'F');
+    c.insertAdjacentHTML('afterbegin',`<div class="stmt">${q.spec.stmt}</div>`);
+  }else if(t==='fill'){
+    renderFill();
+  }else if(t==='faces'){
+    $('#prompt').innerHTML=q.spec.prompt||'這個柱體共有幾個面？';
+    c.innerHTML=`<div class="nums">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="num" type="button" data-n="${n}">${n}</button>`).join('')}</div>`;
+    c.querySelector('.nums').addEventListener('click',e=>{const b=e.target.closest('.num');if(b)checkFaces(+b.dataset.n,b);});
+  }
+  updateInfo();
+}
+function showOpts(opts,right,textOnly){
+  q.right=right;
+  $('#controls').innerHTML=`<div class="opts">${opts.map(o=>`<button class="opt${textOnly?' txt':''}" type="button" data-o="${o}">${textOnly?'':shapeIcon(o)}<span>${shapeLabel(o)}</span></button>`).join('')}</div>`;
+  $('#controls .opts').addEventListener('click',e=>{const b=e.target.closest('.opt');if(b)checkOpt(b.dataset.o,b);});
+}
+function updateInfo(){
+  if(q.task==='base'&&q.stage===1){const p=$('#picked');if(p)p.innerHTML='已選：'+[0,1].map(i=>`<i class="${i<q.picks.length?'on':''}"></i>`).join('');}
+  if(q.task==='side'){const c=$('#counter');if(!c)return;
+    c.innerHTML=L.counter?`還差<b>${totalSides()-q.found.size}</b>個側面`:`已找到<b>${q.found.size}</b>個側面`;}
+  if(q.task==='name')renderName();
+}
+function renderName(){const b=$('#namebox');if(!b)return;b.classList.toggle('ok',!!(q.done&&q.nameOk));
+  b.innerHTML=q.input?q.input+(q.done?'':'<span class="caret"></span>'):'<span class="ph">按下面的字輸入名稱</span><span class="caret"></span>';}
+function say(html,tone){$('#msg').innerHTML=html;const b=$('#bubble');b.classList.remove('good','warn');if(tone)b.classList.add(tone);}
+function stageFlash(good){stage.classList.remove('flash-good','flash-bad');void stage.offsetWidth;stage.classList.add(good?'flash-good':'flash-bad');setTimeout(()=>stage.classList.remove('flash-good','flash-bad'),600);}
+function mistake(){q.mistakes++;if(!q.practice){combo=0;showCombo();}SFX.bad();stageFlash(false);monsterState('laugh',1100);setTalk(pick(LAUGH));
+  /* slow down random tapping: controls pause for a moment after each wrong answer */
+  const pl=$('#play');pl.classList.add('cool');clearTimeout(mistake.t);mistake.t=setTimeout(()=>pl.classList.remove('cool'),1300);
+  if(q.practice||failing)return;
+  lives--;renderLives(lives);
+  if(lives<=0){failing=true;q.done=true;q.busy=true;setTimeout(levelFail,900);}
+}
+function colorRoles(pair){model.faces.forEach((f,i)=>{const isB=pair?pair.includes(i):f.cap;f.col=isB?BASEC:SIDEC;f.glow=false;});}
+function colorBases(){model.faces.forEach(f=>{if(f.cap)f.col=BASEC;});}
+function reveal(){if(q.hidden){q.hidden=false;$('#xtag').hidden=false;}}
+
+/* redo: clear this question's selections (mistakes still count) */
+$('#redoBtn').addEventListener('click',()=>{
+  if(!q||q.done||q.busy)return;SFX.tap();
+  q.picks.forEach(i=>model.faces[i].glow=false);q.picks=[];
+  if(q.task==='side'){q.found.forEach(i=>{model.faces[i].col=NEUTRAL;});q.found.clear();}
+  if(q.task==='name')q.input='';
+  if(!q.hidden)rotateTo(q.startQ);
+  updateInfo();say('重新來過！慢慢看，想清楚再點。');
+});
+/* retry after the answer was shown: practice the same question again */
+$('#retryBtn').addEventListener('click',()=>{
+  SFX.tap();q.practice=true;rotateTo(q.startQ);resetQ();
+  say('再試一次這一題！這次是練習，不會影響分數。');
+});
+
+/* resolve a question: hit the monster */
+function solved(ok){
+  if(failing)return;
+  q.done=true;q.picks=[];model.faces.forEach(f=>f.glow=false);reveal();
+  $('#redoBtn').hidden=true;
+  const sr=stage.getBoundingClientRect();burst(sr.width/2,sr.height/2,ok?40:12,ok&&q.mistakes===0);
+  const nb=$('#nextBtn');nb.textContent=hp<=0?'完成這一關 ★':'下一題 →';
+  if(q.practice){
+    if(ok){SFX.good();say(pick(PRAISE)+'練習成功！記住這個柱體。','good');}
+    $('#retryBtn').hidden=ok;nb.hidden=false;return;
+  }
+  const hit=ok&&q.mistakes<=(q.task==='fill'?2:1);
+  if(!hit){
+    combo=0;showCombo();scores.push(0);
+    const slot=L.qs[q.spec.slot]||[q.spec],alt=slot.filter(x=>x.v!==q.spec.v);
+    L.plan.push(Object.assign({},pick(alt.length?alt:slot),{slot:q.spec.slot}));
+    SFX.laugh();monsterState('laugh',1100);popText('dmg','打不中！');setTalk('嘻嘻，打不中我！');
+    const m=$('#msg');m.insertAdjacentHTML('beforeend','<br><b>這題要再想一想。稍後會再出一題類似的，答對才能打中搗蛋怪！</b>');
+    $('#retryBtn').hidden=false;nb.textContent='下一題 →';nb.hidden=false;return;
+  }
+  const pts=Math.max(0,2-q.mistakes);scores.push(pts);
+  if(ok&&!q.noAlbum&&!save.album.includes(q.v.id)){save.album.push(q.v.id);newCards.push(q.v);}
+  let gain=0;
+  if(ok&&q.mistakes===0){combo++;gain=10+5*Math.min(combo-1,4);}
+  else if(ok&&q.mistakes===1){combo=0;gain=5;}
+  else combo=0;
+  save.coins+=gain;earned+=gain;persist();showCoins();showCombo(true);
+  hp--;renderHearts(hp);
+  if(ok&&q.mistakes===0){SFX.crit();monsterState('crit',800);popText('critx',combo>=2?`會心一擊！×${combo}`:'會心一擊！');stageFlash(true);}
+  else{SFX.hit();monsterState('hit',600);popText('dmg','-1');stageFlash(true);}
+  if(gain){setTimeout(()=>{SFX.coin();popText('cn',`+${gain}`,$('#playCoins'));},250);}
+  setTalk(hp>0?pick(OUCH):'嗚哇！我認輸了！');
+  if(hp<=0)setTimeout(()=>monsterState('dead'),700);
+  nb.textContent=hp<=0?'完成這一關 ★':'下一題 →';
+  nb.hidden=false;
+}
+$('#nextBtn').addEventListener('click',()=>{if(failing)return;SFX.tap();q.practice=false;if(hp>0&&qi<L.plan.length-1){qi++;newQuestion(false);}else levelDone();});
+$('#backBtn').addEventListener('click',()=>{SFX.tap();$('#play').hidden=true;$('#home').hidden=false;renderHome();});
+
+function onFaceTap(fi,x,y){
+  if(!q||q.done||q.hidden)return;
+  if(q.task==='base'&&q.stage===1)baseTap(fi,x,y);
+  else if(q.task==='side')sideTap(fi,x,y);
+}
+
+/* ---------- 找底 ---------- */
+function sameShape(a,b){const s=a.stamp,t=b.stamp;if(s.kind!==t.kind)return false;
+  if(s.kind==='poly')return s.pts===t.pts;if(s.kind==='circle')return true;
+  if(s.kind==='rect')return Math.abs(s.w-t.w)<1e-3&&Math.abs(s.h-t.h)<1e-3;return false;}
+function baseTap(fi,x,y){
+  if(q.busy)return;
+  const f=model.faces[fi],at=q.picks.indexOf(fi);SFX.tap();
+  if(at>=0){q.picks.splice(at,1);f.glow=false;updateInfo();return;}
+  q.picks.push(fi);f.glow=true;updateInfo();
+  if(q.picks.length===1)say('選了一個。再點一個和它<b>一模一樣</b>、<b>面對面</b>的面。');
+  if(q.picks.length===2){q.busy=true;q.tap=[x,y];setTimeout(evalBase,380);}
+}
+function evalBase(){
+  if(!q||q.done||q.picks.length<2){if(q)q.busy=false;return;}
+  const[a,b]=q.picks,fa=model.faces[a],fb=model.faces[b];
+  const facing=dot(fa.normal,fb.normal)<-0.99;
+  if((fa.cap&&fb.cap)||(q.v.box&&facing)){
+    q.basePair=[a,b];colorRoles([a,b]);SFX.good();burst(q.tap[0],q.tap[1],18,true);
+    q.picks=[];q.busy=false;q.stage=2;renderTask();
+    say('對了！這兩個面一模一樣、面對面，就是<span class="b">底</span>。現在看看紫色的底：它是甚麼形狀？','good');
+    return;
+  }
+  mistake();
+  let msg;
+  const low=[a,b].find(i=>!model.faces[i].cap&&worldN(i)[1]<-0.6);
+  if(low!==undefined)msg='底<b>不一定在下面</b>喔！貼着地的這個面是側面。';
+  else if(sameShape(fa,fb)&&!facing)msg='這兩個面一模一樣，可是它們<b>面對面</b>嗎？它們是挨在一起的鄰居。';
+  else if(fa.cap||fb.cap)msg='有一個選對了！另一個呢？要和它<b>一模一樣</b>、<b>面對面</b>。';
+  else msg='這兩個面不一樣。底是<b>一模一樣</b>、<b>面對面</b>的兩個面。';
+  flash(a,RED,700);flash(b,RED,700);
+  setTimeout(()=>{
+    if(failing)return;
+    q.picks.forEach(i=>model.faces[i].glow=false);q.picks=[];q.busy=false;updateInfo();
+    if(q.mistakes===1)say(msg,'warn');
+    else if(q.mistakes===2){showAxisSideways();say(msg+'<br>我幫你轉了一轉。沿着<b>虛線</b>看，哪兩個面面對面？','warn');}
+    else{colorBases();q.stage=2;renderTask();say('看，紫色的兩個面就是<span class="b">底</span>：一模一樣，又面對面。它們是甚麼形狀？','warn');}
+  },650);
+}
+
+/* ---------- 找側面 ---------- */
+function sideTap(fi,x,y){
+  const f=model.faces[fi];
+  if(f.cap){mistake();flash(fi,RED,700);sideLadder('這是<span class="b">底</span>喔！<span class="s">側面</span>是圍在兩個底中間的面。');return;}
+  if(q.found.has(fi)){SFX.tap();say('這個側面已經找到了，找找別的吧。');return;}
+  q.found.add(fi);f.col=SIDEC;flash(fi,SIDEC,450);updateInfo();SFX.good();burst(x,y,10,true);
+  const total=totalSides();
+  if(f.curved){
+    if(L.counter){colorRoles();say(pick(PRAISE)+'圓柱只有 <b>1</b> 個側面，它是彎彎的曲面。','good');solved(true);}
+    else say('找到一個彎彎的曲面側面。還有嗎？找齊了就按「我找齊了」。');
+    return;
+  }
+  if(L.counter){
+    if(q.found.size===total){colorRoles();say(pick(PRAISE)+`這個柱體有 <b>${total}</b> 個<span class="s">側面</span>，都是長方形。`,'good');solved(true);}
+    else say(`找到了！還差 ${total-q.found.size} 個。`);
+  }else say(`找到 ${q.found.size} 個了。找齊了，就按「我找齊了」。`);
+}
+function sideDone(){
+  if(q.done)return;
+  const total=totalSides();
+  if(q.found.size===total){colorRoles();say(pick(PRAISE)+(model.faces.some(f=>f.curved)?'圓柱只有 <b>1</b> 個側面，它是彎彎的曲面。':`一共有 <b>${total}</b> 個<span class="s">側面</span>。底有 ${total} 條邊，側面就有 ${total} 個。`),'good');solved(true);return;}
+  mistake();sideLadder('還有側面沒找到喔！看看<b>虛線</b>圍着的面，它們躲在後面。');
+}
+function sideLadder(msg){
+  if(q.mistakes===1)say(msg,'warn');
+  else if(q.mistakes===2){colorBases();say(msg+'<br>紫色的是<span class="b">底</span>，其他圍着的面都是側面。','warn');}
+  else{colorRoles();say(`看，橙色的都是<span class="s">側面</span>，一共 ${totalSides()} 個。`,'warn');solved(false);}
+}
+
+/* ---------- 名稱 ---------- */
+function checkName(){
+  if(q.done)return;
+  const s=q.input.replace(/體$/,'');
+  if(!s){say('先按下面的字，拼出名稱。');return;}
+  const ans=answerName();
+  if(s===ans){
+    q.nameOk=true;colorRoles();SFX.good();
+    say(pick(PRAISE)+(q.k==='c'?'它的底是圓形，所以叫<b>圓柱體</b>。':`它的底是${polyName(q.k)}，所以叫<b>${ans}體</b>。`),'good');
+    solved(true);renderName();return;
+  }
+  mistake();
+  let m;const mm=s.match(/^([一二三四五六七八九十])角柱$/);
+  if(q.spec.hints)m=q.spec.hints[Math.min(q.mistakes,2)-1];
+  else if(/[錐球]/.test(s))m='它上下有兩個一樣的底，是<b>柱體</b>，不是錐體或球體。';
+  else if(q.k==='c'&&s.includes('角'))m='它的底有角嗎？看看底是甚麼形狀。';
+  else if(q.k!=='c'&&s.startsWith('圓'))m='它的底是圓形嗎？看看底的形狀，數一數有幾條邊。';
+  else if(mm&&q.k!=='c'){const g=CN.indexOf(mm[1]);m=g===q.k+2?'你數的是全部的面嗎？名稱只看<b>底</b>有幾條邊。':'再數一數，<b>底</b>有幾條邊？';}
+  else m=q.k==='c'?'想一想：底是圓形的柱體，叫甚麼名字？':'名稱的寫法是：幾<b>角柱</b>體，例如「三角柱體」。';
+  if(q.mistakes===1)say(m,'warn');
+  else if(q.mistakes===2){if(!q.hidden){colorBases();m+='<br>紫色的是<span class="b">底</span>，數一數它有幾條邊。';}say(m,'warn');}
+  else{q.input=ans+'體';colorRoles();say(`答案是<b>${ans}體</b>。`+(q.k==='c'?'底是圓形，側面是 1 個曲面。':`底是${polyName(q.k)}，有 ${q.k} 條邊，所以有 ${q.k} 個側面。`),'warn');solved(false);renderName();}
+}
+
+/* ---------- 選擇題（底的形狀、側面、分類） ---------- */
+function shapeLabel(o){if(o==='T')return '對';if(o==='F')return '錯';return o==='rect'?'長方形':o==='circle'?'圓形':o==='para'?'平行四邊形':o==='prism'?'角柱':o==='cyl'?'圓柱':polyName(+o.slice(1));}
+function shapeIcon(o){
+  const st='fill="#D9C4F2" stroke="#2A3346" stroke-width="2" stroke-linejoin="round"';
+  if(o==='T')return `<svg viewBox="0 0 64 52"><circle cx="32" cy="26" r="21" fill="#DDF3E8" stroke="#23885C" stroke-width="3"/><path d="M21 27 L29 35 L44 18" fill="none" stroke="#23885C" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  if(o==='F')return `<svg viewBox="0 0 64 52"><circle cx="32" cy="26" r="21" fill="#FBE4DE" stroke="#C0462F" stroke-width="3"/><path d="M23 17 L41 35 M41 17 L23 35" stroke="#C0462F" stroke-width="5" stroke-linecap="round"/></svg>`;
+  if(o==='rect')return `<svg viewBox="0 0 64 52"><rect x="6" y="12" width="52" height="28" ${st}/></svg>`;
+  if(o==='circle')return `<svg viewBox="0 0 64 52"><circle cx="32" cy="26" r="21" ${st}/></svg>`;
+  if(o==='para')return `<svg viewBox="0 0 64 52"><polygon points="16,12 60,12 48,40 4,40" ${st}/></svg>`;
+  if(o==='prism')return `<svg viewBox="0 0 64 52"><polygon points="10,18 32,6 54,18 54,44 32,50 10,44" fill="#FBE2C4" stroke="#2A3346" stroke-width="2" stroke-linejoin="round"/><polyline points="10,18 32,26 54,18 M32,26 32,50" fill="none" stroke="#2A3346" stroke-width="2"/></svg>`;
+  if(o==='cyl')return `<svg viewBox="0 0 64 52"><path d="M12 12 L12 40 A20 7 0 0 0 52 40 L52 12" fill="#CDEBE3" stroke="#2A3346" stroke-width="2"/><ellipse cx="32" cy="12" rx="20" ry="7" fill="#CDEBE3" stroke="#2A3346" stroke-width="2"/></svg>`;
+  const n=+o.slice(1);
+  if(n===4)return `<svg viewBox="0 0 64 52"><polygon points="6,40 58,40 46,12 18,12" ${st}/></svg>`;
+  const p=[];for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;p.push((32+22*Math.cos(a)).toFixed(1)+','+(28+22*Math.sin(a)).toFixed(1));}
+  return `<svg viewBox="0 0 64 52"><polygon points="${p.join(' ')}" ${st}/></svg>`;
+}
+function optHint(o){
+  const t=q.task;
+  if(t==='classify')return o==='cyl'?'它有沒有彎彎的曲面？角柱的面全都是平的。':'它有一個彎彎的曲面，可以滾動。這是哪一種柱體？';
+  if(t==='sideShape')return '<span class="s">側面</span>是圍在兩個底中間的面。角柱的側面都是甚麼形狀？';
+  if(o==='rect')return '長方形是<span class="s">側面</span>的形狀喔。底是一模一樣、面對面的兩個面。';
+  return '再數一數，<span class="b">底</span>有幾條邊？';
+}
+function checkOpt(o,btn){
+  if(q.done||q.tried.has(o))return;
+  const t=q.task;
+  if(t==='tf'){
+    q.tried.add(o);
+    if(o===q.right){btn.classList.add('right');SFX.good();colorRoles();say(pick(PRAISE)+q.spec.why,'good');solved(true);}
+    else{btn.classList.add('wrong');mistake();q.mistakes++;const r=document.querySelector(`.opt[data-o="${q.right}"]`);if(r)r.classList.add('right');
+      colorRoles();say(`這句話是<b>${q.spec.ans?'對':'錯'}</b>的。`+q.spec.why,'warn');solved(false);}
+    return;
+  }
+  if(o===q.right){
+    btn.classList.add('right');SFX.good();
+    if(t==='classify'){colorRoles();say(pick(PRAISE)+(q.k==='c'?'它有一個曲面，是<b>圓柱</b>。':'它的面全都是平的，是<b>角柱</b>。'),'good');}
+    else if(t==='sideShape'){colorRoles();say(pick(PRAISE)+'角柱的<span class="s">側面</span>都是長方形。','good');}
+    else{if(q.basePair)colorRoles(q.basePair);else colorRoles();say(pick(PRAISE)+`底是<b>${shapeLabel(o)}</b>`+(q.k==='c'?'，所以叫圓柱體。':`，有 ${q.k} 條邊，所以叫<b>${typeName(q.k)}</b>。`),'good');}
+    solved(true);return;
+  }
+  q.tried.add(o);btn.classList.add('wrong');mistake();q.m2++;
+  const m=optHint(o);
+  if(q.m2===1)say(m,'warn');
+  else if(q.m2===2){if(t==='sideShape'||t==='classify')colorRoles();else colorBases();say(m+'<br>看看圖上塗了顏色的面。','warn');}
+  else{colorRoles(q.basePair||undefined);const r=document.querySelector(`.opt[data-o="${q.right}"]`);if(r)r.classList.add('right');
+    say(`答案是<b>${shapeLabel(q.right)}</b>。`,'warn');solved(false);}
+}
+function checkFaces(n,btn){
+  if(q.done||q.tried.has(n))return;
+  const sides=q.k==='c'?1:q.k,ans=sides+2;
+  if(n===ans){btn.classList.add('right');colorRoles();SFX.good();say(pick(PRAISE)+`2 個<span class="b">底</span>加 ${sides} 個<span class="s">側面</span>，共有 <b>${ans}</b> 個面。`,'good');solved(true);return;}
+  q.tried.add(n);btn.classList.add('wrong');mistake();
+  const m=q.spec.hints?q.spec.hints[Math.min(q.mistakes,2)-1]:n===sides?'你只數了側面，還有 2 個<span class="b">底</span>！':n<sides?'有些面躲在後面，看看<b>虛線</b>。':'數一數：2 個底，加上側面。';
+  if(q.mistakes===1)say(m,'warn');
+  else if(q.mistakes===2){if(q.hidden)say(m,'warn');else{colorRoles();say(m+'<br>紫色的是底，橙色的是側面，一個一個數。','warn');}}
+  else{colorRoles();const r=document.querySelector(`.num[data-n="${ans}"]`);if(r)r.classList.add('right');say(`答案是 <b>${ans}</b> 個面。`,'warn');solved(false);}
+}
+/* ---------- 分類物件（習作 P.26） ---------- */
+const objCache={};
+function objThumb(it){
+  if(objCache[it.name])return objCache[it.name];
+  const c=document.createElement('canvas');c.width=240;c.height=180;const x=c.getContext('2d');
+  const m=buildVariant(VBY[it.v]);m.faces.forEach(f=>f.col=it.col);
+  drawModel(x,240,180,m,poseQ(it.pose,true),{thin:true,xray:true});
+  return objCache[it.name]=c.toDataURL('image/png');
+}
+function showObj(i){
+  const it=q.spec.items[i];model=buildVariant(VBY[it.v]);model.faces.forEach(f=>f.col=it.col);viewQ=poseQ(it.pose,true);anim=null;flashes=[];
+}
+function checkSort(){
+  if(q.done)return;
+  const items=q.spec.items;
+  if(items.some((_,i)=>!q.assign[i])){say('還有物件未選，每個都要選「角柱」或「圓柱」。');return;}
+  const bad=items.map((it,i)=>q.assign[i]===it.t?-1:i).filter(i=>i>=0);
+  if(!bad.length){SFX.good();say(pick(PRAISE)+'有曲面、可以滾動的是<b>圓柱</b>；面全都是平的是<b>角柱</b>。','good');solved(true);renderTask();return;}
+  mistake();q.m2++;
+  if(q.m2===1)say(`有 ${bad.length} 個放錯了。想一想：它有沒有彎彎的曲面？`,'warn');
+  else if(q.m2===2){q.badSet=new Set(bad);say('紅色的放錯了，再點一點改正。','warn');renderTask();}
+  else{items.forEach((it,i)=>q.assign[i]=it.t);q.badSet=null;say('看看正確的答案：有曲面的是圓柱，面全都是平的是角柱。','warn');solved(false);renderTask();}
+}
+
+/* ---------- 填填看（習作 P.27 第 8 題） ---------- */
+const FILL=['name','faces','base','sides'];
+const FILL_HINT={name:'名稱看<span class="b">底</span>的形狀，數一數底有幾條邊。',faces:'2 個<span class="b">底</span>，加上<span class="s">側面</span>，共有幾個面？',
+  base:'底是一模一樣、面對面的兩個面，它們是甚麼形狀？',sides:'底有幾條邊，就有幾個<span class="s">側面</span>。'};
+function fillAnswer(k){const sides=q.k;return k==='name'?answerName():k==='faces'?sides+2:k==='base'?polyName(sides).replace(/形$/,''):sides;}
+function renderFill(){
+  const b=i=>`<span class="blank${i===q.sub&&!q.done?' cur':''}${q.missed[i]?' miss':''}">${q.fillv[i]!==undefined?q.fillv[i]:'？'}</span>`;
+  $('#prompt').innerHTML='填填看。';
+  const c=$('#controls');
+  c.innerHTML=`<div class="fillsent">右圖是一個 ${b(0)} 體，共有 ${b(1)} 個面。<br>2 個底是相同的 ${b(2)} 形，${b(3)} 個側面都是長方形。</div><div id="fillui" class="controls"></div>`;
+  if(q.done)return;
+  const k=FILL[q.sub],u=$('#fillui');
+  if(k==='name'){
+    const keys=['一','二','三','四','五','六','七','八','九','十','角','柱','體','圓','錐','球'];
+    u.innerHTML=`<div class="namebox" id="namebox"></div><div class="keys">${keys.map(ch=>`<button class="key${'角柱體圓錐球'.includes(ch)?' word':''}" type="button" data-ch="${ch}">${ch}</button>`).join('')}
+      <button class="key fn" type="button" data-fn="del">⌫ 刪除</button><button class="key fn" type="button" data-fn="clr">清除</button></div><button class="big" type="button" id="okBtn">確定</button>`;
+    u.querySelector('.keys').addEventListener('click',e=>{const bt=e.target.closest('.key');if(!bt||q.done)return;SFX.tap();
+      if(bt.dataset.fn==='del')q.input=q.input.slice(0,-1);else if(bt.dataset.fn==='clr')q.input='';else if(q.input.length<5)q.input+=bt.dataset.ch;renderName();});
+    $('#okBtn').addEventListener('click',()=>{const v=q.input.replace(/體$/,'');if(!v){say('先按下面的字，拼出名稱。');return;}fillCheck(v,null);});
+    renderName();
+  }else if(k==='base'){
+    const opts=shuffle(['p'+q.k,'rect',...nearShapes(q.k)]);
+    u.innerHTML=`<div class="opts">${opts.map(o=>`<button class="opt txt" type="button" data-o="${o}"><span>${shapeLabel(o)}</span></button>`).join('')}</div>`;
+    u.querySelector('.opts').addEventListener('click',e=>{const bt=e.target.closest('.opt');if(bt&&!bt.classList.contains('wrong'))fillCheck(polyName(+bt.dataset.o.slice(1)||0).replace(/形$/,'')+(bt.dataset.o==='rect'?'#':''),bt);});
+  }else{
+    u.innerHTML=`<div class="nums">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="num" type="button" data-n="${n}">${n}</button>`).join('')}</div>`;
+    u.querySelector('.nums').addEventListener('click',e=>{const bt=e.target.closest('.num');if(bt&&!bt.classList.contains('wrong'))fillCheck(+bt.dataset.n,bt);});
+  }
+}
+function fillCheck(val,btn){
+  if(q.done)return;
+  const k=FILL[q.sub],ans=fillAnswer(k);
+  const next=()=>{q.sub++;q.m2=0;q.input='';
+    if(q.sub>=FILL.length){colorRoles();
+      if(q.failed)say('全部填好了，看看紅色的格子，記住正確答案。','warn');
+      else say(pick(PRAISE)+`這是${answerName()}體：2 個底，${q.k} 個側面，共 ${q.k+2} 個面。`,'good');
+      solved(!q.failed);renderFill();}
+    else renderFill();};
+  if(val===ans){q.fillv[q.sub]=ans;SFX.good();if(q.m2===0)say('對了！填下一格。','good');next();return;}
+  mistake();q.m2++;if(btn)btn.classList.add('wrong');
+  if(q.m2===1)say(FILL_HINT[k],'warn');
+  else if(q.m2===2){if(k==='sides'||k==='faces')colorRoles();else colorBases();say(FILL_HINT[k]+'<br>看看圖上塗了顏色的面。','warn');}
+  else{q.fillv[q.sub]=ans;q.missed[q.sub]=true;q.failed=true;say(`這一格是「${ans}」。`,'warn');next();}
+}
+const PRAISE=['答對了！','好棒！','真厲害！','沒錯！','做得好！'];
+
+/* ---------- level complete ---------- */
+function levelFail(){
+  $('#play').classList.remove('cool');SFX.laugh();
+  $('#ovCard').classList.remove('album');
+  $('#ovCard').innerHTML=`<div style="width:120px">${monsterSVG(li,'laugh')}</div>
+    <h2>${MONSTERS[li].name}逃走了！</h2>
+    <p>你的勇氣用完了。不要亂按，<b>看清楚、想一想</b>才作答。</p>
+    <p style="color:var(--muted);font-size:16px">記住：底是一模一樣、面對面的兩個面；虛線是躲起來的邊。</p>
+    <div class="ov-row"><button class="big alt" type="button" id="ovHome2">回到城堡</button><button class="big" type="button" id="ovAgain2">再挑戰一次</button></div>`;
+  $('#overlay').hidden=false;
+  $('#ovAgain2').addEventListener('click',()=>{$('#overlay').hidden=true;startLevel(li);});
+  $('#ovHome2').addEventListener('click',()=>{$('#overlay').hidden=true;$('#play').hidden=true;$('#home').hidden=false;renderHome();});
+}
+function levelDone(){
+  const max=NQ*2,pts=scores.reduce((a,b)=>a+b,0),st=pts>=max*0.9?3:pts>=max*0.6?2:1,first=save.stars[li]===0;
+  save.stars[li]=Math.max(save.stars[li],st);persist();
+  const allDone=castleDone();
+  SFX.win();confetti(160);
+  $('#ovCard').classList.remove('album');
+  $('#ovCard').innerHTML=`<div style="width:120px">${monsterSVG(li,'dead')}</div>
+    <h2>打敗${MONSTERS[li].name}！</h2>
+    <div class="ov-stars">${'<b>★</b>'.repeat(st)}${'★'.repeat(3-st)}</div>
+    <p>這一關得到 <b>${earned}</b> 個金幣${first?`，還拿回了<b>${LEVELS[li].reward}</b>`:''}！</p>
+    ${newCards.length?`<p>新收集的柱體卡：</p><div class="newcards">${newCards.map(v=>`<div class="card got"><img src="${thumbCache[v.id]||(thumbCache[v.id]=thumb(v,false))}" alt=""><span class="ty">${typeName(v.n)}</span><span>${v.nick}</span></div>`).join('')}</div>`:''}
+    ${st<3?'<p style="color:var(--muted);font-size:16px">一次就答對會「會心一擊」，3 粒星就靠它！</p>':''}
+    ${L.final&&first?'<p><b>你打敗了終極魔王，成為「柱體大師」！</b></p>':allDone&&first?'<p><b>城堡砌好了！終極關卡開啟了！</b></p>':''}
+    <div class="ov-row"><button class="big alt" type="button" id="ovAgain">再玩一次</button><button class="big" type="button" id="ovHome">${first?'放上城堡':'回到城堡'}</button></div>`;
+  $('#overlay').hidden=false;
+  $('#ovAgain').addEventListener('click',()=>{$('#overlay').hidden=true;startLevel(li);});
+  $('#ovHome').addEventListener('click',()=>{$('#overlay').hidden=true;$('#play').hidden=true;$('#home').hidden=false;renderHome(first?li:-1);if(first)SFX.coin();});
+}
+
+renderHome();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
